@@ -58,3 +58,21 @@ flowchart TB
     GENAI -->|"⑤ 厳選プラグイン昇格保存 / タスク更新"| MyHome
     MyHome <-->|"⑥ 重いデータ・履歴はSupabaseへ退避"| SB
     GENAI -.->|"⑦ 設計・成果を公的記録"| GH
+
+
+
+MyHomeStudio/
+├── bpmn/
+│   └── myhome_life.bpmn            # 🏠 家の設計図 (BPMN 2.0 XML / 図面座標付き)
+├── core/
+│   └── bpmn_engine.gs              # 🧭 BPMS プロセス状態遷移・タスク実行エンジン
+├── plugins/
+│   └── plugin_*.html               # 🧩 チャットから厳選昇格された業務HTMLプラグイン群
+├── src/
+│   ├── chrome_background.js        # 🌐 Chrome Extension バックグラウンド制御
+│   └── vscode_web_extension.js    # 💻 VS Code Web 拡張機能エントリ
+├── models/
+│   └── soul_db.gs                  # 🦆 ナレッジ & パフォーマンストラッキング
+├── analysis/
+│   └── stlite_duckdb_app.py        # 📊 PyScript / stlite データ分析アプリ
+└── gas_web_ide_studio_2.html       # 🎛️ MyHomeStudio 操作盤コアエンジン
