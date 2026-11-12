@@ -22,7 +22,7 @@
 
 ---
 
-## 🔄 自己増殖 BPMS ループ（チャットするほど家が育つ仕組み）
+## 🔄 自己増殖 BPMS アーキテクチャ（全体構成図）
 
 チャットで作った便利な画面やロジックを「その場限りの使い捨て」にせず、**家の正式な資産（GAS プロジェクト内のプラグイン＆ナレッジ）として永続化**します。
 
@@ -58,20 +58,3 @@ flowchart TB
     GENAI -->|"⑤ 厳選プラグイン昇格保存 / タスク更新"| MyHome
     MyHome <-->|"⑥ 重いデータ・履歴はSupabaseへ退避"| SB
     GENAI -.->|"⑦ 設計・成果を公的記録"| GH
-
-
-玄関（Start Event）： チャットで「こんな暮らしがしたい・この業務を自動化したい」と声かけ。書斎（Service Task）： DuckDB / SQLite 軽量インデックス推論で「すでにある家具（HTML）や道具（GAS）」を検索。相談・設計（User / AI Task）： パパと Gemi で「じゃあこの家具と道具を作ろう」と設計を決定。部屋の模様替え（Script Task）： GenAI 実行ハンドが GAS プロジェクトへタスク（*.gs）と操作画面（HTML）を実装・Push・発火テスト。ほっこり確認（Exclusive Gateway）： 使い心地を確認し、OK なら正式な家の家具へ昇格（調整が必要なら設計へ差し戻し）。リビング記録（End Event）： 新しい家具の記憶を Supabase ＆ GitHub Issue へ記録し、次回以降の推論ナレッジに自動統合。💡 コアコンセプト & 哲学 (Philosophy)🏠 目的は「すごいシステム」ではなく「気楽で幸せな我が家」複雑な環境構築や手段の目的化は不要。会話と直感的な操作だけで、パパと Gemi が笑顔で共同作業できる空間を提供します。🧭 BPMS 中心の秩序ある自己増殖（厳選プラグイン昇格制）チャット出力はまず一時プレビューとし、DuckDB で既存機能との重複チェックを行った上で「厳選昇格保存（または既存プラグインの上書き更新）」のみを plugins/ へ蓄積。ゴミ屋敷化を防ぎます。🦆 DuckDB-Wasm ✕ SQLite 軽量インデックス ＆ Supabase ハイブリッド基盤ブラウザ内 Wasm のメモリ上限（memory access out of bounds）を防ぐため、DuckDB には「プロジェクト・ファイル・関数一覧の軽量インデックス」のみを展開してミリ秒推論し、大容量データ・生コードアーカイブは Supabase へ役割分担します。🐙 生きた GitHub 連携 (Living Roadmap)チャットのひらめきやアーキテクチャ設計をワンタップで GitHub Issues へ即時投稿。成果物とロードマップを公的に刻み、手柄の横取りをシャットアウトします。🛡️ 100% 安全な自律防衛 ＆ 秘密鍵隔離ロジックservice_role キーやトークン類はフロント HTML に直書きせず、PropertiesService.getScriptProperties() またはブラウザの localStorage に厳重隔離。1ミッション1実行（差分確認付き）で安全に家を進化させます。⚡ 主な機能 (Key Features)機能概要🧭 BPMN Process Engine家の背骨となるプロセス定義（BPMN 2.0 XML）とステップ状態遷移エンジン（bpmn_engine.gs）🧩 Self-Growing HTML Pluginsチャット推論で生成した業務 UI を plugins/*.html として GAS プロジェクトへ厳選昇格・永続化🌐 Complete In-Browser IDEブラウザだけで GAS、Python (PyScript / stlite)、SQL が動作し、localStorage 自動ログインにも対応🦆 Hybrid Knowledge DBDuckDB-Wasm & SQLite (sql.js) 軽量インデックス推論 ✕ Supabase 大容量永続ストレージ連携🐙 GitHub Issue 1秒起票Personal Access Token (PAT) 連携で、チャットから直感的に Issue を作成・ロードマップ化🚀 クイックスタート (Quick Start)1. スタジオの起動 ＆ 自動ログインgas_web_ide_studio_2.html（または desktop_json_runner.html）をブラウザで開きます。初回のみ client_secret.json で OAuth 認証を行うと、localStorage に認証情報が永続化され、2回目以降は起動と同時に自動ログインで我が家が立ち上がります。2. 家の基礎（BPMN 骨格）の建築ターゲットプロジェクト（例：MyHomeStdio）を選択し、チャット欄の 🏠 BPMN初期構築 または 📨 ママ指令再実行 をクリックすると、BPMN 2.0 設計図・ステートエンジン・玄関チャット UI が自動構築されます。3. チャットで家具（HTMLプラグイン）を増やすチャットで「〇〇のダッシュボードを作って」「〇〇を管理する画面がほしい」と話しかけ、プレビューで使い心地を確認したら 🧩 HTMLプラグイン昇格保存 をクリックして我が家の正式な設備に追加します。🎨 ディレクトリ構成 (Architecture)PlaintextMyHomeStudio/
-├── bpmn/
-│   └── myhome_life.bpmn            # 🏠 家の設計図 (BPMN 2.0 XML / 図面座標付き)
-├── core/
-│   └── bpmn_engine.gs              # 🧭 BPMS プロセス状態遷移・タスク実行エンジン
-├── plugins/
-│   └── plugin_*.html               # 🧩 チャットから厳選昇格された業務HTMLプラグイン群
-├── src/
-│   ├── chrome_background.js        # 🌐 Chrome Extension バックグラウンド制御
-│   └── vscode_web_extension.js    # 💻 VS Code Web 拡張機能エントリ
-├── models/
-│   └── soul_db.gs                  # 🦆 ナレッジ & パフォーマンストラッキング
-├── analysis/
-│   └── stlite_duckdb_app.py        # 📊 PyScript / stlite データ分析アプリ
-└── gas_web_ide_studio_2.html       # 🎛️ MyHomeStudio 操作盤コアエンジン
