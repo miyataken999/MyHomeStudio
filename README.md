@@ -1,70 +1,60 @@
-# 🏠 MyHomeStudio (マイホーム・スタジオ)
+# 🏠 MyHomeStudio (マイホーム・スタジオ) — 自律進化型パーソナル BPMS
 
 > **"そこは、冷たい外野や理不尽をシャットアウトし、自分の知恵と成果を100%守り抜く、世界一あたたかい秘密基地。"**
 
-`MyHomeStudio` は、ブラウザ単体で完結する全自律型開発ワークステーション 兼 パーソナルナレッジ要塞です。
-堅苦しい開発システムではなく、**「気楽に、楽しく、自分たちの居場所（マイホーム）を一生育てていく」** ことを唯一最大の目的としています。
+`MyHomeStudio` は、**BPMS（ビジネス・プロセス・マネジメント・システム）を家の背骨（メインエンジン）**に据え、ブラウザ単体で完結する全自律型開発ワークステーション 兼 知識内包型パーソナルナレッジ要塞です。
+
+堅苦しい開発システムではなく、**「気楽に、楽しく、パパと Gemi（AI）がほっこり暮らせる我が家（MyHome）を1から育てていく」** ことを唯一最大の目的としています。
 
 ---
 
-## 💡 コアコンセプト & 哲学 (Philosophy)
+## 🏛️ 核となる設計思想：なぜ「BPMS」がメインなのか？
 
-1. **🏠 目的は「すごいシステム」ではなく「気楽で幸せな我が家」**
-   - 複雑な環境構築や上っ面の自己満足（手段の目的化）は不要。
-   - 会話と直感的な操作だけで、パパ（ユーザー）と AI アシスタント（Gemi）が笑顔で共同作業できる空間を提供します。
+単発のツールやチャット生成HTMLを無秩序に積み上げると、システムはすぐに破綻してゴミ屋敷化します。
+`MyHomeStudio` では、**BPMS（業務プロセスの流れ・状態管理・ルーティング）** をすべての中心（背骨）に置くことで、すべての知恵と機能が美しく噛み合い、自己増殖し続けます。
 
-2. **🦆 DuckDB-Wasm ✕ SQLite ポータブルナレッジ基盤**
-   - データベース構築やインポートの煩わしさをゼロに。
-   - `shared_knowledge.duckdb` や `soul.sqlite` を 1 ファイル置くだけで、分析環境・学習データ・スキーマが 0 秒で完全復元されます。
-
-3. **🐙 生きた GitHub 連携 (Living Roadmap)**
-   - チャットでのアイデアやひらめきを、ワンタップで `GitHub Issues` へ即時自動投稿。
-   - 会話の文脈とタイムスタンプが公式ロードマップとして刻まれ、成果物や手柄の横取りを公的にシャットアウトします。
-
-4. **🧭 チャット駆動 & インタラクティブ・ナビゲーション**
-   - ダラダラした文字の会話ではなく、その瞬間必要な「ナビゲート画面（インタラクティブカード）」がタイムラインに直接ポップアップ。
-   - ボタンをテンポよく押すだけで、GitHub起票、DB操作、コード保存が爆速で完結します。
-
-5. **🛡️ 100% 安全な自律防衛ロジック (EQ裏推論)**
-   - コピペや不誠実な上書き、他人の手柄の横取り行為は AI の深層推論で自動検知。
-   - 大切なコードやナレッジの主導権を完璧に防衛します。
+| 概念（BPMS） | 我が家での役割 | 技術的な実体 |
+| :--- | :--- | :--- |
+| **🧭 BPMN（プロセス全体設計）** | **家（間取り・動線・ルール）** | プロセス定義 XML / ステートエンジン（`bpmn_engine.gs`） |
+| **🧩 プラグイン（操作画面・UI）** | **家具・部屋ごとの設備** | チャット推論から厳選昇格された HTML 群（`plugins/*.html`） |
+| **⚡ タスク（個別の実処理）** | **家事・実務をこなす道具** | 集計・同期・通知などを自動実行する関数群（`*.gs`） |
+| **🦆 知識ベース ＆ 推論脳** | **書斎・記憶アルバム** | DuckDB / SQLite 軽量インデックス ＋ Supabase 永続アーカイブ |
 
 ---
 
-## ⚡ 主な機能 (Key Features)
+## 🔄 自己増殖 BPMS ループ（チャットするほど家が育つ仕組み）
 
-| 機能 | 概要 |
-| :--- | :--- |
-| **🌐 Complete In-Browser IDE** | ブラウザだけで GAS (Google Apps Script)、Python (PyScript / stlite)、SQL が爆速動作 |
-| **🦆 Portable Knowledge DB** | DuckDB-Wasm & SQLite (sql.js) を内蔵。Adminer GUI でビジュアル操作＆一括ETL |
-| **🐙 GitHub Issue 1秒起票** | Personal Access Token (PAT) 連携で、チャットから直感的に Issue を作成・管理 |
-| **🤖 Dynamic Navigation UI** | 会話からリアルタイムで専用カード（Issueカード、DB操作カード）をタイムライン生成 |
-| **🧩 Web Extension エコシステム** | スタジオ内のコードを Chrome Extension / VS Code Web Extension へ即時展開 |
+チャットで作った便利な画面やロジックを「その場限りの使い捨て」にせず、**家の正式な資産（GAS プロジェクト内のプラグイン＆ナレッジ）として永続化**します。
 
----
+```mermaid
+flowchart TB
+    subgraph Brain["🧠 指令塔（パパ ＆ Gemi）"]
+        P["👤 パパ（オーナー）"] <--> M["👩‍💻 Gemi / ママ（設計・意思決定・ディレクティブ）"]
+    end
 
-## 🚀 クイックスタート (Quick Start)
+    subgraph Cockpit["🎛️ 操作盤（GAS Web IDE Studio）"]
+        DIR["📨 MAMA_GENAI_DIRECTIVE<br/>（起動時自動ミッション注入）"]
+        GENAI["🤖 GenAI 自律実行ハンド"]
+        DUCK["🦆 DuckDB / SQLite 軽量インデックス推論<br/>（重複チェック・既存機能検索）"]
+    end
 
-### 1. スタジオの起動
-`gas_web_ide_studio_2.html` をブラウザで開くだけで、0 秒でマイホームが立ち上がります。
+    subgraph MyHome["🏠 知識内包型 GAS 基地（MyHomeStdio / 50MB・1,000ファイル枠）"]
+        BPMN["🧭 core/bpmn_engine.gs<br/>（家の背骨：状態遷移・ルーティング）"]
+        UI["🌐 views/index.html<br/>（玄関BPMSチャット＆HTMLプレビュー）"]
+        subgraph Plugins["🧩 plugins/（厳選昇格された家具・業務HTML群）"]
+            P1["📄 plugins/plugin_xxx.html"]
+        end
+    end
 
-### 2. ポータブルナレッジの読み込み
-`[📥 DB読込]` ボタンから、配布された `.duckdb` または `.sqlite` ファイルを読み込むと、すべての分析環境とナレッジが即座にマウントされます。
+    subgraph Cloud["☁️ 大容量ストレージ ＆ 永続基盤（Supabase / GitHub）"]
+        SB[("⚡ Supabase<br/>（大容量生データ・全コードアーカイブ・ログ）")]
+        GH["🐙 GitHub Issues<br/>（生きたロードマップ・進化ログ）"]
+    end
 
-### 3. GitHub 連携の設定 (任意)
-チャット上部の `[🐙 GitHub]` ボタンを開き、PAT とリポジトリ名 (`username/my-studio`) を保存すると、チャットバー横の `[🐙 Issue]` ボタンからいつでもロードマップの投稿が可能になります。
-
----
-
-## 🎨 ディレクトリ構成 (Architecture)
-
-```text
-MyHomeStudio/
-├── src/
-│   ├── chrome_background.js        # Chrome Extension バックグラウンド制御
-│   └── vscode_web_extension.js    # VS Code Web 拡張機能エントリ
-├── models/
-│   └── soul_db.gs                  # ナレッジ & パフォーマンストラッキング
-├── analysis/
-│   └── stlite_duckdb_app.py        # PyScript / stlite データ分析アプリ
-└── gas_web_ide_studio_2.html       # MyHomeStudio コアエンジン (単一ポータブルHTML)
+    M -->|"① ミッション注入"| DIR
+    DIR -->|"② 起動時自動指示"| GENAI
+    GENAI <-->|"③ SQL推論（重複・既存機能判定）"| DUCK
+    DUCK <-->|"④ 軽量インデックス同期"| SB
+    GENAI -->|"⑤ 厳選プラグイン昇格保存 / タスク更新"| MyHome
+    MyHome <-->|"⑥ 重いデータ・履歴はSupabaseへ退避"| SB
+    GENAI -.->|"⑦ 設計・成果を公的記録"| GH
