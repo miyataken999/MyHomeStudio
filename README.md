@@ -61,7 +61,7 @@ flowchart TB
 
 
 
-MyHomeStudio/
+# MyHomeStudio
 ├── bpmn/
 │   └── myhome_life.bpmn            # 🏠 家の設計図 (BPMN 2.0 XML / 図面座標付き)
 ├── core/
