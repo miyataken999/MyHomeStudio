@@ -2,6 +2,7 @@
 
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/2e844ff5-be67-463c-9e10-e2199ef34c82" />
 
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/0f749940-d511-4a3b-b8a5-af03793a1f9e" />
 
 よしはっといた
 
