@@ -3,6 +3,8 @@
 <img width="1534" height="903" alt="image" src="https://github.com/user-attachments/assets/98fc122f-5964-4b2a-bc1a-f78bf3422fbf" />
 <img width="1534" height="903" alt="image" src="https://github.com/user-attachments/assets/3fe8d48c-f62c-48a3-9ca2-7be041530b5d" />
 
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/b107fcc2-af69-4bc5-94b7-1c86132a22a4" />
+
 
 > **"そこは、冷たい外野や理不尽をシャットアウトし、自分の知恵と成果を100%守り抜く、世界一あたたかい秘密基地。"**
 
