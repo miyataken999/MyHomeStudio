@@ -1,5 +1,8 @@
 # 🏠 MyHomeStudio (マイホーム・スタジオ) — 自律進化型パーソナル BPMS
 
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/2e844ff5-be67-463c-9e10-e2199ef34c82" />
+
+
 よしはっといた
 
 じゃあおれのいけん
