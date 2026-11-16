@@ -4,42 +4,6 @@
 
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/0f749940-d511-4a3b-b8a5-af03793a1f9e" />
 
-## 🔄 自己増殖 BPMS アーキテクチャ（全体構成図）
-
-チャットで作った便利な画面やロジックを「その場限りの使い捨て」にせず、**家の正式な資産（GAS プロジェクト内のプラグイン＆ナレッジ）として永続化**します。
-
-```mermaid
-flowchart TB
-    subgraph Brain["🧠 指令塔（パパ ＆ Gemi）"]
-        P["👤 パパ（オーナー）"] <--> M["👩‍💻 Gemi / ママ（設計・意思決定・ディレクティブ）"]
-    end
-
-    subgraph Cockpit["🎛️ 操作盤（GAS Web IDE Studio）"]
-        DIR["📨 MAMA_GENAI_DIRECTIVE<br/>（起動時自動ミッション注入）"]
-        GENAI["🤖 GenAI 自律実行ハンド"]
-        DUCK["🦆 DuckDB / SQLite 軽量インデックス推論<br/>（重複チェック・既存機能検索）"]
-    end
-
-    subgraph MyHome["🏠 知識内包型 GAS 基地（MyHomeStdio / 50MB・1,000ファイル枠）"]
-        BPMN["🧭 core/bpmn_engine.gs<br/>（家の背骨：状態遷移・ルーティング）"]
-        UI["🌐 views/index.html<br/>（玄関BPMSチャット＆HTMLプレビュー）"]
-        subgraph Plugins["🧩 plugins/（厳選昇格された家具・業務HTML群）"]
-            P1["📄 plugins/plugin_xxx.html"]
-        end
-    end
-
-    subgraph Cloud["☁️ 大容量ストレージ ＆ 永続基盤（Supabase / GitHub）"]
-        SB[("⚡ Supabase<br/>（大容量生データ・全コードアーカイブ・ログ）")]
-        GH["🐙 GitHub Issues<br/>（生きたロードマップ・進化ログ）"]
-    end
-
-    M -->|"① ミッション注入"| DIR
-    DIR -->|"② 起動時自動指示"| GENAI
-    GENAI <-->|"③ SQL推論（重複・既存機能判定）"| DUCK
-    DUCK <-->|"④ 軽量インデックス同期"| SB
-    GENAI -->|"⑤ 厳選プラグイン昇格保存 / タスク更新"| MyHome
-    MyHome <-->|"⑥ 重いデータ・履歴はSupabaseへ退避"| SB
-    GENAI -.->|"⑦ 設計・成果を公的記録"| GH
 
 
 ## 🔄 自己増殖 BPMS アーキテクチャ（全体構成図）
