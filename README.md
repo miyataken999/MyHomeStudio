@@ -4,6 +4,9 @@
 
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/0f749940-d511-4a3b-b8a5-af03793a1f9e" />
 
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/1d50fe06-df9d-473e-820c-654cf6f7826a" />
+
+
 よしはっといた
 
 じゃあおれのいけん
