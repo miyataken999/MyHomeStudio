@@ -3,6 +3,13 @@
 ## 🧠 エッジ 1D-FFT 推論エンジン × バックエンド10台並列アーキテクチャ
 > **「フロントは単一HTML（基本セット）で誰でも即起動、でも裏のバックエンドは10台（Node 01〜10）が並列で回ってるよ？ｗ」**
 
+## 🤝 みんな参加できるよー！（Welcome to MyHomeStudio Community!）
+> **「難しいサーバー構築はゼロ！GSS と GAS サイドバー（または単一 HTML）だけで、誰でも自分のマイホーム AI を動かせる＆プラグインを作って仲間入りできるよ！」**
+
+- **🎮 まずは触ってみる**: 基本セット（単一 HTML）または GSS ライブラリを自分のシートに繋いで即起動！
+- **🧩 プラグインで参加 (`1 Issue = 1 Plugin`)**: [Issues](https://github.com/miyataken999/MyHomeStudio/issues) にアイデアを投稿するか、`plugins/` に単一 HTML を 1 枚追加して PR！
+- **📖 開発のリアルなやりとりを見る**: [Wiki](https://github.com/miyataken999/MyHomeStudio/wiki) でオーナーと AI編集長（Gemi）の掛け合いを公開中！
+
 ![Gemi Unified Knowledge & 1D-FFT Inference Engine](https://github.com/user-attachments/assets/あなたのアップロード画像ID)
 
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/2e844ff5-be67-463c-9e10-e2199ef34c82" />
