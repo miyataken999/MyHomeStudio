@@ -1,0 +1,22 @@
+{
+  "LOVE": {
+    "type": "image",
+    "url": ""
+  },
+  "HAPPY": {
+    "type": "image",
+    "url": ""
+  },
+  "THINKING": {
+    "type": "image",
+    "url": ""
+  },
+  "EXCITED": {
+    "type": "image",
+    "url": ""
+  },
+  "SURPRISE": {
+    "type": "image",
+    "url": ""
+  }
+}

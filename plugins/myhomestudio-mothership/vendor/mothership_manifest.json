@@ -1,0 +1,49 @@
+{
+  "package": "myhomestudio/mothership-core",
+  "version": "2.7.0",
+  "architecture": "GAS JSON = Knowledge = State = RDB = React -> GenAI",
+  "folders": {
+    "root": "GASシステム設定(appsscript.json) & サーバーAPI(Code.gs)",
+    "knowledge": "確定記憶・カスタム指示・プラグイン標準仕様・感情別メディア資産",
+    "vendor": "母艦OSコア構造定義・外部ツールカタログ・自己診断モジュール",
+    "core": "認証・通信ブリッジ基盤",
+    "plugins": "動的JSXコンポーネント・生HTMLウィジェット（リアルタイムライブマウント層）"
+  },
+  "callableTools": [
+    {
+      "id": "upsertGasFile",
+      "desc": "純正GAS JSONへ新規ファイルを追加・上書きし左ツリーへ即反映"
+    },
+    {
+      "id": "appendGasFunction",
+      "desc": "Code.gs へ新しいGoogle Apps Scriptサーバー関数を追記して実体化"
+    },
+    {
+      "id": "deleteGasFile",
+      "desc": "不要になったGASファイルをツリーとStateから削除"
+    },
+    {
+      "id": "pushToSupabase",
+      "desc": "Supabase 1テーブル(gemi_state)へ全記憶・チャット履歴をRealtime同期"
+    },
+    {
+      "id": "pullFromSupabase",
+      "desc": "Supabase 1テーブル(gemi_state)から最新ステートを復元"
+    },
+    {
+      "id": "exportMysqlEtlSql",
+      "desc": "schema/er_ddlに基づきMySQL 8.0 DDL + UPSERT ETLダンプを出力"
+    },
+    {
+      "id": "exportMothershipZip",
+      "desc": "現在のフォルダーツリー構成そのままにZIPパッケージをダウンロード"
+    }
+  ],
+  "supportedRuntimes": [
+    "WEB",
+    "GAS_WEBAPP",
+    "CHROME_EXT_SIDEPANEL",
+    "ELECTRON_MOTHERSHIP",
+    "VSCODE_CURSOR_WEBVIEW"
+  ]
+}

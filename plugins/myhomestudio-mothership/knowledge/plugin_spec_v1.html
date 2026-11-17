@@ -1,0 +1,15 @@
+<!-- 📚 ナレッジ層：MyHomeStudio プラグイン標準規格 v1.0 -->
+<spec id="plugin_spec_v1">
+  <schema>
+    {
+      "files": [
+        { "name": "folder/module_name", "type": "HTML | SERVER_JS | JSON", "source": "..." }
+      ]
+    }
+  </schema>
+  <mountRule>
+    React側はGASの name ("/" 区切り) をそのままパースしてフォルダー階層を構築し、
+    plugins/ 配下を動的Reactコンポーネントとしてコンパイル・マウントする。
+    sharedProps: { gasJson, geminiApiKey, spectrumData, onUpsertFile, onSync, speakText, setEmotion }
+  </mountRule>
+</spec>

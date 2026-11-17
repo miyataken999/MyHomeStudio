@@ -1,0 +1,171 @@
+// 🎛️ 分身プラグイン：1D-FFT グラフィックイコライザー & 逆変換(IFFT)分析ラボ
+function FftEqualizerPlugin({ gasJson, speakText, setEmotion }) {
+  const [sampleText, setSampleText] = React.useState("2026-11-15 売上トレンド 安定成長 + 突発スパイク障害検知ログ 99999 ERROR_SPIKE");
+  const [bands, setBands] = React.useState(() => Array(16).fill(1.0));
+
+  const applyPreset = (type) => {
+    if (type === "lowpass") {
+      setBands(Array.from({ length: 16 }, (_, i) => (i < 5 ? 1.4 : 0.05)));
+      if (setEmotion) setEmotion("THINKING");
+      if (speakText) speakText("ローパスフィルタ適用！高周波ノイズを削って、全体の大きなトレンドだけを抽出したよ。", "THINKING");
+    } else if (type === "highpass") {
+      setBands(Array.from({ length: 16 }, (_, i) => (i >= 10 ? 1.6 : 0.05)));
+      if (setEmotion) setEmotion("SURPRISE");
+      if (speakText) speakText("ハイパスフィルタ適用！定常トレンドを消して、突発的な異常値やスパイクだけを浮かび上がらせたよ！", "SURPRISE");
+    } else {
+      setBands(Array(16).fill(1.0));
+      if (setEmotion) setEmotion("HAPPY");
+    }
+  };
+
+  const analysis = React.useMemo(() => {
+    const N = 32;
+    const rawWave = new Float64Array(N);
+    for (let i = 0; i < sampleText.length; i++) rawWave[i % N] += sampleText.charCodeAt(i);
+    let mean = 0;
+    for (let i = 0; i < N; i++) mean += rawWave[i];
+    mean /= N;
+    for (let i = 0; i < N; i++) rawWave[i] -= mean;
+
+    const re = new Float64Array(N);
+    const im = new Float64Array(N);
+    for (let k = 0; k < N; k++) {
+      let sRe = 0, sIm = 0;
+      for (let n = 0; n < N; n++) {
+        const ang = (2 * Math.PI * k * n) / N;
+        sRe += rawWave[n] * Math.cos(ang);
+        sIm -= rawWave[n] * Math.sin(ang);
+      }
+      const bin = k <= N / 2 ? k : N - k;
+      const gain = bands[Math.min(15, bin)] ?? 1.0;
+      re[k] = sRe * gain;
+      im[k] = sIm * gain;
+    }
+
+    const restoredWave = new Float64Array(N);
+    for (let n = 0; n < N; n++) {
+      let sum = 0;
+      for (let k = 0; k < N; k++) {
+        const ang = (2 * Math.PI * k * n) / N;
+        sum += re[k] * Math.cos(ang) - im[k] * Math.sin(ang);
+      }
+      restoredWave[n] = sum / N;
+    }
+
+    const eqSpec = Array.from({ length: 16 }, (_, k) => Math.hypot(re[k], im[k]));
+    const norm = Math.hypot(...eqSpec) || 1;
+    const normEq = eqSpec.map(v => v / norm);
+
+    const ranking = (gasJson.files || []).map(f => {
+      const fw = new Float64Array(N);
+      const txt = f.name + "\n" + f.source;
+      for (let i = 0; i < txt.length; i++) fw[i % N] += txt.charCodeAt(i);
+      let fm = 0;
+      for (let i = 0; i < N; i++) fm += fw[i];
+      fm /= N;
+      for (let i = 0; i < N; i++) fw[i] -= fm;
+
+      const fSpec = Array.from({ length: 16 }, (_, k) => {
+        let r = 0, im2 = 0;
+        for (let n = 0; n < N; n++) {
+          const ang = (2 * Math.PI * k * n) / N;
+          r += fw[n] * Math.cos(ang);
+          im2 -= fw[n] * Math.sin(ang);
+        }
+        return Math.hypot(r, im2);
+      });
+      const fn = Math.hypot(...fSpec) || 1;
+      const normF = fSpec.map(v => v / fn);
+      const dist = Math.sqrt(normEq.reduce((acc, v, idx) => acc + Math.pow(v - normF[idx], 2), 0));
+      return { name: f.name, dist };
+    }).sort((a, b) => a.dist - b.dist);
+
+    const maxAbs = Math.max(1, ...Array.from(rawWave).map(Math.abs), ...Array.from(restoredWave).map(Math.abs));
+    return { rawWave: Array.from(rawWave), restoredWave: Array.from(restoredWave), maxAbs, ranking };
+  }, [sampleText, bands, gasJson]);
+
+  return (
+    <div className="p-4 bg-slate-800/90 rounded-xl border border-cyan-500/40 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-cyan-300 font-bold text-sm">🎛️ 1D-FFT グラフィックイコライザー & 逆変換 (IFFT) ラボ</h3>
+          <p className="text-[11px] text-slate-400">周波数帯をスライダーで加工 → 逆FFTで元のデータ波形へ再合成＆記憶共鳴テスト</p>
+        </div>
+        <div className="flex gap-1.5 text-[11px]">
+          <button onClick={() => applyPreset("lowpass")} className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium">📉 低周波トレンド抽出</button>
+          <button onClick={() => applyPreset("highpass")} className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded font-medium">⚡ 高周波異常値抽出</button>
+          <button onClick={() => applyPreset("flat")} className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded">フラット</button>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        value={sampleText}
+        onChange={e => setSampleText(e.target.value)}
+        placeholder="分析したいログ・売上データ・テキスト波形を入力..."
+        className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-xs text-cyan-200 font-mono"
+      />
+
+      <div className="bg-slate-950/90 p-3 rounded-lg border border-slate-800">
+        <div className="flex justify-between text-[10px] text-slate-400 mb-2">
+          <span>◀ 低周波 (全体トレンド・ベース)</span>
+          <span>中周波 (周期パターン)</span>
+          <span>高周波 (突発スパイク・ノイズ) ▶</span>
+        </div>
+        <div className="gap-1 items-end h-28" style={{ display: "grid", gridTemplateColumns: "repeat(16, minmax(0, 1fr))" }}>
+          {bands.map((gain, idx) => (
+            <div key={idx} className="flex flex-col items-center h-full justify-between">
+              <span className="text-[9px] font-mono text-cyan-400">{gain.toFixed(1)}</span>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={gain}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  setBands(prev => prev.map((b, i) => (i === idx ? val : b)));
+                }}
+                style={{ writingMode: "vertical-lr", direction: "rtl" }}
+                className="h-16 w-3 accent-pink-500 cursor-pointer"
+              />
+              <span className="text-[9px] font-mono text-slate-500">f{idx}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-slate-950/90 p-3 rounded-lg border border-slate-800 space-y-1.5">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-slate-300 font-bold">🌊 逆FFT (IFFT) 再合成波形比較</span>
+          <span className="space-x-3">
+            <span className="text-slate-500">■ 元波形 (Raw)</span>
+            <span className="text-pink-400">■ イコライザー通過後の再合成波形 (IFFT)</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-1 h-20 pt-2">
+          {analysis.rawWave.map((rawVal, idx) => {
+            const restVal = analysis.restoredWave[idx];
+            const rawPct = Math.min(100, (Math.abs(rawVal) / analysis.maxAbs) * 100);
+            const restPct = Math.min(100, (Math.abs(restVal) / analysis.maxAbs) * 100);
+            return (
+              <div key={idx} className="flex-1 h-full flex items-end justify-center gap-[1px] bg-slate-900/50 rounded-sm px-[1px]">
+                <div style={{ height: Math.max(4, rawPct) + "%" }} className="w-1/2 bg-slate-600/70 rounded-t-[1px]" />
+                <div style={{ height: Math.max(4, restPct) + "%" }} className="w-1/2 bg-pink-500 rounded-t-[1px] transition-all duration-150" />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="text-purple-300 font-bold">🎯 イコライザー後の共鳴記憶 Top-3:</span>
+        {analysis.ranking.slice(0, 3).map((r, idx) => (
+          <span key={r.name} className="px-2 py-0.5 rounded bg-purple-950/70 border border-purple-700/40 text-purple-200 font-mono">
+            #{idx + 1} {r.name} ({r.dist.toFixed(3)})
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}

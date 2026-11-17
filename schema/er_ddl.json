@@ -1,0 +1,99 @@
+{
+  "dialect": "mysql8",
+  "charset": "utf8mb4",
+  "tables": [
+    {
+      "name": "mothership_files",
+      "comment": "GAS純正JSONファイル実体・確定記憶",
+      "columns": [
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(32)",
+          "nullable": false
+        },
+        {
+          "name": "folder",
+          "type": "VARCHAR(64)",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "LONGTEXT",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "personal_memories",
+      "comment": "自動学習パーソナルメモリーログ",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "logged_time",
+          "type": "VARCHAR(32)",
+          "nullable": false
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "gemi_realtime_state",
+      "comment": "Supabase 1テーブルRealtime同期ステート",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(128)",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "emotion",
+          "type": "VARCHAR(32)",
+          "nullable": false
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(64)",
+          "nullable": false
+        },
+        {
+          "name": "payload_json",
+          "type": "JSON",
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "gemi_realtime_state",
+      "to": "mothership_files",
+      "label": "syncs_jsonb"
+    },
+    {
+      "from": "gemi_realtime_state",
+      "to": "personal_memories",
+      "label": "archives_logs"
+    }
+  ]
+}

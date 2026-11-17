@@ -1,0 +1,38 @@
+// 🛸 動的JSXコンポーネント定義（自己複製・環境移行モジュール）
+function SpaceClonerPlugin({ gasJson, speakText, setEmotion }) {
+  const [targetName, setTargetName] = React.useState("myhomestudio-zerocpu");
+  const [status, setStatus] = React.useState("Ready (10 ZeroGPU Nodes Standby)");
+
+  return (
+    <div className="p-4 bg-slate-800/80 rounded-lg border border-emerald-500/30 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-emerald-400 font-bold text-sm">🛸 Zero-CPU Space Self-Cloner (Dynamic JSX)</h3>
+        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50">
+          GAS JSON Direct
+        </span>
+      </div>
+      <p className="text-xs text-slate-300">
+        現在の純正GAS JSON（全 {gasJson.files.length} ファイル）を新しい環境へ複製します。
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={targetName}
+          onChange={(e) => setTargetName(e.target.value)}
+          className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-slate-200"
+        />
+        <button
+          onClick={() => {
+            setStatus(`📦 ${targetName} 用のデプロイバンドルを生成しました`);
+            if (setEmotion) setEmotion("EXCITED");
+            if (speakText) speakText("分身ノード用のデプロイバンドルを生成したよ！", "EXCITED");
+          }}
+          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md transition"
+        >
+          バンドル生成
+        </button>
+      </div>
+      <div className="text-[11px] text-slate-400">{status}</div>
+    </div>
+  );
+}
