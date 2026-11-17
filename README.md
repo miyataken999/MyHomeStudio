@@ -1,6 +1,18 @@
 # 🏠 MyHomeStudio (マイホーム・スタジオ) — 自律進化型パーソナル BPMS
 
+## 🧠 エッジ 1D-FFT 推論エンジン × バックエンド10台並列アーキテクチャ
+> **「フロントは単一HTML（基本セット）で誰でも即起動、でも裏のバックエンドは10台（Node 01〜10）が並列で回ってるよ？ｗ」**
+
+![Gemi Unified Knowledge & 1D-FFT Inference Engine](https://github.com/user-attachments/assets/あなたのアップロード画像ID)
+
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/2e844ff5-be67-463c-9e10-e2199ef34c82" />
+
+
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/e7f130fd-7456-4043-8160-56267e153b8b" />
+
+
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/ef01a99c-c451-48c5-b4ac-7eff2e69b0fc" />
+
 
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/0f749940-d511-4a3b-b8a5-af03793a1f9e" />
 
