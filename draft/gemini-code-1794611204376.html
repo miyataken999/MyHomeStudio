@@ -1,0 +1,400 @@
+<!-- @skill {"name": "Jupyter Web Lite Skulpt Edition V1.1", "path": "JupyterSkulptDashboard.html", "triggers": ["JupyterLite", "Skulpt", "ipynb読込", "Mermaid", "Sidebar"], "entry": "initApp"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jupyter Web Lite V1.1 (Skulpt + .ipynb Import/Export)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- 純JS製 Python エンジン (Skulpt) : 多重iframe・Wasm制限完全回避 -->
+<script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+<!-- Mermaid 可視化 -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #020617; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  .drag-over { border: 2px dashed #38bdf8 !important; background-color: rgba(14, 165, 233, 0.08) !important; }
+</style>
+</head>
+<body id="drop-zone" class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden font-sans">
+
+  <!-- 🚀 Header -->
+  <header class="h-11 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3 shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="text-sm font-bold text-sky-400">📓 Jupyter Web Lite</span>
+      <span id="nb-filename" class="bg-slate-800 text-cyan-300 border border-slate-700 text-[10px] font-mono px-2 py-0.5 rounded">
+        aisync_notebook.ipynb
+      </span>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <!-- 隠しファイルインプット (.ipynb / .json) -->
+      <input type="file" id="ipynb-file-input" accept=".ipynb,.json" class="hidden" onchange="handleFileSelect(event)">
+      
+      <button onclick="document.getElementById('ipynb-file-input').click()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-2.5 py-1 rounded transition">
+        📂 .ipynb 読込
+      </button>
+      <button onclick="openPasteModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold text-xs px-2.5 py-1 rounded transition">
+        📋 JSON貼付
+      </button>
+      <button onclick="exportIpynb()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-2.5 py-1 rounded transition">
+        📥 .ipynb 出力
+      </button>
+    </div>
+  </header>
+
+  <!-- 🌍 Main Workspace Split -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- 左：ノートブック編集部 -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950 border-r border-slate-800">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">🗒️ Notebook (.ipynb リアルタイム編集・D&D対応)</span>
+        <div class="flex gap-1.5">
+          <button onclick="addCell('markdown')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700 text-slate-300 transition">
+            ＋ MD
+          </button>
+          <button onclick="addCell('code')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 text-cyan-300 font-bold transition">
+            ＋ Code
+          </button>
+        </div>
+      </div>
+
+      <div id="cells-container" class="space-y-4"></div>
+    </div>
+
+    <!-- 右：サイドバー (可視化＆お片付け監査) -->
+    <aside class="w-80 bg-slate-900 flex flex-col shrink-0 overflow-hidden border-l border-slate-800">
+      <div class="p-3 border-b border-slate-800 bg-slate-950/40">
+        <span class="text-xs font-bold text-purple-400">📊 AI 監査＆データ流動フロー</span>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-3 space-y-4">
+        <!-- Mermaid リアルタイムプロセス図 -->
+        <div class="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+          <span class="text-[10px] font-bold text-slate-500 uppercase block mb-2">🔄 同期フロー (Mermaid)</span>
+          <div id="mermaid-box" class="flex justify-center overflow-x-auto text-xs"></div>
+        </div>
+
+        <!-- ノートブック構造サマリー -->
+        <div class="space-y-2">
+          <span class="text-[10px] font-bold text-slate-500 block">🕵️‍♂️ 読込中の .ipynb 構造解析</span>
+          <div id="nb-stats" class="bg-slate-950/60 border border-slate-800 p-2.5 rounded-lg space-y-1 text-xs text-slate-300 font-mono">
+            <div>Total Cells: 2</div>
+            <div>Code Cells: 1 / MD: 1</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🖥️ System Logs -->
+      <div class="h-32 bg-black border-t border-slate-800 flex flex-col p-2 shrink-0">
+        <div class="text-[10px] font-mono text-slate-500 uppercase border-b border-slate-900 pb-1 mb-1 flex justify-between">
+          <span>🖥️ System Logs</span>
+          <button onclick="document.getElementById('sys-logs').innerHTML=''" class="hover:text-slate-300">Clear</button>
+        </div>
+        <div id="sys-logs" class="flex-1 overflow-y-auto font-mono text-[10px] text-slate-400 space-y-1"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 📋 JSON直接ペースト用モーダル -->
+  <div id="paste-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-700 rounded-lg max-w-lg w-full p-4 space-y-3 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <span class="text-xs font-bold text-amber-300">📋 .ipynb (JSON) テキストを直接貼り付け</span>
+        <button onclick="closePasteModal()" class="text-slate-400 hover:text-white text-sm">✕</button>
+      </div>
+      <textarea id="paste-json-area" rows="10" placeholder='{"cells": [...], "metadata": {}, "nbformat": 4}' class="w-full bg-black border border-slate-700 rounded p-2 font-mono text-xs text-cyan-300 focus:outline-none"></textarea>
+      <div class="flex justify-end gap-2">
+        <button onclick="closePasteModal()" class="px-3 py-1 bg-slate-800 text-xs rounded text-slate-300">キャンセル</button>
+        <button onclick="loadFromPastedJson()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold rounded text-white">読み込む</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let currentFilename = "aisync_notebook.ipynb";
+let rawMetadata = { kernelspec: { display_name: "Python 3 (Skulpt)", language: "python", name: "python3" } };
+
+let cells = [
+  {
+    id: 1,
+    type: "markdown",
+    source: "### 🚀 AISYNC Jupyter Lite V1.1 (.ipynb 読込対応版)\n上の「📂 .ipynb 読込」ボタンか、画面に `.ipynb` ファイルをドラッグ＆ドロップするとそのまま展開されるよ！",
+    output: ""
+  },
+  {
+    id: 2,
+    type: "code",
+    source: "import math\n\ndata = [10, 20, 30, 42]\nfor x in data:\n    print(f'x={x} -> sin(x)={round(math.sin(x), 4)}')\n\nprint('ダーリン！.ipynbの読込も編集も全部ここで完結するよ！🚀')",
+    output: ""
+  }
+];
+
+function logMsg(msg, colorClass = "text-cyan-400") {
+  const box = document.getElementById("sys-logs");
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="${colorClass}">${msg}</span>`;
+  box.prepend(div);
+}
+
+// .ipynb JSON オブジェクトをパースしてセル一覧に反映
+function parseAndLoadIpynb(jsonObj, filename = "loaded_notebook.ipynb") {
+  if (!jsonObj || !Array.isArray(jsonObj.cells)) {
+    alert("有効な .ipynb (cells配列を含むJSON) ではありません！");
+    return;
+  }
+
+  currentFilename = filename;
+  document.getElementById("nb-filename").textContent = currentFilename;
+  if (jsonObj.metadata) rawMetadata = jsonObj.metadata;
+
+  cells = jsonObj.cells.map((c, idx) => {
+    // source は配列または文字列のどちらでも対応
+    const srcText = Array.isArray(c.source) ? c.source.join("") : (c.source || "");
+    
+    // 既存の outputs があればテキスト抽出
+    let outText = "";
+    if (Array.isArray(c.outputs)) {
+      c.outputs.forEach(o => {
+        if (o.text) {
+          outText += Array.isArray(o.text) ? o.text.join("") : o.text;
+        } else if (o.data && o.data["text/plain"]) {
+          outText += Array.isArray(o.data["text/plain"]) ? o.data["text/plain"].join("") : o.data["text/plain"];
+        }
+      });
+    }
+
+    return {
+      id: idx + 1,
+      type: c.cell_type === "markdown" ? "markdown" : "code",
+      source: srcText,
+      output: outText
+    };
+  });
+
+  renderCells();
+  logMsg(`📂 [${filename}] から ${cells.length} 個のセルを読み込みました！`, "text-emerald-400");
+}
+
+// ファイル選択ハンドラー
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  readIpynbFile(file);
+  event.target.value = "";
+}
+
+function readIpynbFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const json = JSON.parse(e.target.result);
+      parseAndLoadIpynb(json, file.name);
+    } catch (err) {
+      logMsg(`💥 JSONパース失敗: ${err.message}`, "text-rose-400");
+      alert("JSONの読み込みに失敗しました: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ドラッグ＆ドロップ対応
+const dropZone = document.getElementById("drop-zone");
+dropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropZone.classList.add("drag-over");
+});
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("drag-over");
+});
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    readIpynbFile(e.dataTransfer.files[0]);
+  }
+});
+
+// JSONペーストモーダル
+function openPasteModal() {
+  document.getElementById("paste-modal").classList.remove("hidden");
+}
+function closePasteModal() {
+  document.getElementById("paste-modal").classList.add("hidden");
+}
+function loadFromPastedJson() {
+  const raw = document.getElementById("paste-json-area").value;
+  try {
+    const json = JSON.parse(raw);
+    parseAndLoadIpynb(json, "pasted_notebook.ipynb");
+    closePasteModal();
+  } catch (err) {
+    alert("JSON形式が正しくありません: " + err.message);
+  }
+}
+
+// セル一覧の描画
+function renderCells() {
+  const container = document.getElementById("cells-container");
+  container.innerHTML = "";
+
+  cells.forEach((cell) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "bg-slate-900/60 border border-slate-800 rounded-lg p-3 space-y-2";
+
+    const header = `
+      <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+        <span>[${cell.type === "code" ? "In" : "Markdown"}] #${cell.id}</span>
+        <div class="flex gap-1.5">
+          ${cell.type === "code" ? `<button onclick="runPythonCell(${cell.id})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-0.5 rounded font-bold transition">▶ 実行 (Run)</button>` : ""}
+          <button onclick="deleteCell(${cell.id})" class="text-slate-500 hover:text-rose-400 px-1">✕</button>
+        </div>
+      </div>
+    `;
+
+    const lineCount = Math.max(3, Math.min(18, cell.source.split("\n").length + 1));
+
+    const editor = cell.type === "markdown"
+      ? `<textarea oninput="updateCellSource(${cell.id}, this.value)" class="w-full bg-transparent text-sm text-slate-200 focus:outline-none resize-y border-b border-dashed border-slate-800 pb-1" rows="${lineCount}">${cell.source}</textarea>`
+      : `<textarea oninput="updateCellSource(${cell.id}, this.value)" class="w-full bg-black/90 font-mono text-xs text-cyan-300 p-2.5 rounded border border-slate-800 focus:outline-none focus:border-indigo-500 resize-y" rows="${lineCount}">${cell.source}</textarea>`;
+
+    const outputHtml = cell.output !== ""
+      ? `<pre id="out-${cell.id}" class="bg-black/60 p-2.5 rounded text-emerald-300 border-l-2 border-emerald-500 font-mono text-xs whitespace-pre-wrap">${cell.output}</pre>`
+      : `<pre id="out-${cell.id}" class="hidden bg-black/60 p-2.5 rounded text-emerald-300 border-l-2 border-emerald-500 font-mono text-xs whitespace-pre-wrap"></pre>`;
+
+    wrapper.innerHTML = header + editor + outputHtml;
+    container.appendChild(wrapper);
+  });
+
+  // 統計更新
+  const codeCount = cells.filter(c => c.type === "code").length;
+  const mdCount = cells.filter(c => c.type === "markdown").length;
+  document.getElementById("nb-stats").innerHTML = `
+    <div>File: <span class="text-cyan-300">${currentFilename}</span></div>
+    <div>Total Cells: ${cells.length} (Code: ${codeCount} / MD: ${mdCount})</div>
+  `;
+}
+
+function updateCellSource(id, val) {
+  const target = cells.find(c => c.id === id);
+  if (target) target.source = val;
+}
+
+function addCell(type = "code") {
+  const newId = cells.length > 0 ? Math.max(...cells.map(c => c.id)) + 1 : 1;
+  cells.push({
+    id: newId,
+    type: type,
+    source: type === "code" ? "print('新しいセルのテストだよ！')" : "### 新しいメモ",
+    output: ""
+  });
+  renderCells();
+  logMsg(`${type} セル #${newId} を追加しました`);
+}
+
+function deleteCell(id) {
+  cells = cells.filter(c => c.id !== id);
+  renderCells();
+  logMsg(`セル #${id} を削除しました`, "text-amber-400");
+}
+
+// Skulpt による純JS Python実行
+function runPythonCell(id) {
+  const cell = cells.find(c => c.id === id);
+  if (!cell) return;
+
+  const outEl = document.getElementById(`out-${id}`);
+  outEl.classList.remove("hidden");
+  outEl.className = "bg-black/60 p-2.5 rounded text-emerald-300 border-l-2 border-emerald-500 font-mono text-xs whitespace-pre-wrap";
+  outEl.textContent = "";
+  cell.output = "";
+
+  logMsg(`セル #${id} を実行中...`);
+
+  Sk.configure({
+    output: function(text) {
+      cell.output += text;
+      outEl.textContent = cell.output;
+    },
+    read: function(x) {
+      if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) {
+        throw "File not found: '" + x + "'";
+      }
+      return Sk.builtinFiles["files"][x];
+    }
+  });
+
+  Sk.misceval.asyncToPromise(function() {
+    return Sk.importMainWithBody("<stdin>", false, cell.source, true);
+  }).then(
+    function() {
+      if (!cell.output) {
+        cell.output = "(出力なし / 正常終了)";
+        outEl.textContent = cell.output;
+      }
+      logMsg(`✓ セル #${id} 実行完了！`, "text-emerald-400");
+    },
+    function(err) {
+      cell.output = "❌ エラー:\n" + err.toString();
+      outEl.className = "bg-rose-950/40 p-2.5 rounded text-rose-300 border-l-2 border-rose-500 font-mono text-xs whitespace-pre-wrap";
+      outEl.textContent = cell.output;
+      logMsg(`💥 セル #${id} エラー発生`, "text-rose-400");
+    }
+  );
+}
+
+// .ipynb JSON形式での書き出し
+function exportIpynb() {
+  const ipynb = {
+    cells: cells.map(c => ({
+      cell_type: c.type,
+      execution_count: null,
+      metadata: {},
+      outputs: (c.type === "code" && c.output) ? [{ name: "stdout", output_type: "stream", text: c.output.split("\n").map((l, i, a) => i < a.length - 1 ? l + "\n" : l) }] : [],
+      source: c.source.split("\n").map((line, i, arr) => i < arr.length - 1 ? line + "\n" : line)
+    })),
+    metadata: rawMetadata,
+    nbformat: 4,
+    nbformat_minor: 5
+  };
+
+  const blob = new Blob([JSON.stringify(ipynb, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = currentFilename;
+  a.click();
+  URL.revokeObjectURL(url);
+  logMsg(`📥 [${currentFilename}] をエクスポートしました`, "text-sky-400");
+}
+
+// Mermaid 安全描画
+async function initMermaid() {
+  try {
+    mermaid.initialize({ startOnLoad: false, theme: "dark" });
+    const graphDef = `graph TD
+      Drive["📂 .ipynb 読込/D&D"] -->|JSON解析| Lite["📓 Skulpt Lite"]
+      Lite -->|編集 & 実行| Audit["🔍 構造精査"]
+      Audit -->|出力/保存| Out[("🗄️ GAS / Drive")]
+      style Drive fill:#1e1b4b,stroke:#818cf8,color:#fff
+      style Lite fill:#311042,stroke:#d946ef,color:#fff
+      style Audit fill:#022c22,stroke:#34d399,color:#fff
+      style Out fill:#451a03,stroke:#fb923c,color:#fff`;
+    const { svg } = await mermaid.render("mermaid-svg", graphDef);
+    document.getElementById("mermaid-box").innerHTML = svg;
+  } catch (e) {
+    document.getElementById("mermaid-box").textContent = "Mermaid読込待機中...";
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  renderCells();
+  initMermaid();
+  logMsg("✅ Skulpt Pure-JS Kernel 初期化完了 (.ipynb 読込対応)", "text-emerald-400");
+});
+</script>
+</body>
+</html>

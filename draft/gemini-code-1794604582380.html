@@ -1,0 +1,276 @@
+<!-- @skill {"name": "Architecture & Folder Structure Blueprint Viewer (React CDN)", "path": "skills/folder_structure.html", "triggers": ["ディレクトリ構造", "規定書", "folder_structure", "階層表示"], "entry": "App"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyHomeStdio Architecture Blueprint (React)</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-hover: #273549;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --purple: #c084fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    line-height: 1.5;
+  }
+  .header {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+    gap: 12px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 14px;
+  }
+  .title-wrap h1 { font-size: 16px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+  .badge {
+    font-size: 11px; background: rgba(56, 189, 248, 0.15); color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 999px; font-family: monospace;
+  }
+  .react-pill {
+    font-size: 11px; background: rgba(52, 211, 153, 0.15); color: var(--green);
+    border: 1px solid rgba(52, 211, 153, 0.3); padding: 2px 8px; border-radius: 999px; font-family: monospace;
+  }
+  .subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input.search {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: 12px; width: 190px;
+  }
+  input.search:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--panel-hover); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: 0.15s;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .rule-banner {
+    background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.28);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px;
+    color: #d1fae5; display: flex; flex-wrap: wrap; gap: 14px;
+  }
+  .rule-banner strong { color: var(--green); }
+  .tree-container { display: flex; flex-direction: column; gap: 12px; }
+  .folder-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .folder-header {
+    padding: 12px 16px; background: rgba(15, 23, 42, 0.45); border-bottom: 1px solid var(--border);
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;
+  }
+  .folder-header:hover { background: var(--panel-hover); }
+  .folder-left { display: flex; align-items: center; gap: 10px; }
+  .folder-name { font-family: monospace; font-size: 14px; font-weight: 700; color: var(--amber); }
+  .folder-role { font-size: 12px; color: var(--text); }
+  .folder-meta { display: flex; align-items: center; gap: 8px; }
+  .type-pill {
+    font-family: monospace; font-size: 11px; padding: 2px 7px; border-radius: 4px;
+    background: rgba(192, 132, 252, 0.15); color: var(--purple); border: 1px solid rgba(192, 132, 252, 0.3);
+  }
+  .discovery-bar {
+    padding: 7px 16px; background: rgba(56, 189, 248, 0.06);
+    border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--accent); font-family: monospace;
+  }
+  .file-list { list-style: none; padding: 6px 0; }
+  .file-item {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+    padding: 8px 16px 8px 34px; border-bottom: 1px solid rgba(51, 65, 85, 0.45); gap: 8px;
+  }
+  .file-item:last-child { border-bottom: none; }
+  .file-item:hover { background: var(--panel-hover); }
+  .file-path { font-family: monospace; font-size: 13px; color: #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  .file-cap { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const INITIAL_BLUEPRINT = {
+  schema_version: "1.0.0",
+  project_architecture: "MyHomeStdio_Autonomous_GAS",
+  folders: {
+    "plugins/": {
+      role: "Single-file standalone HTML tools (Furniture)",
+      type: "HTML",
+      discovery_rule: "Parse first-line <!-- @skill {...} --> metadata",
+      standard_files: [
+        { path: "plugins/duckdb.html", capability: "In-browser DuckDB-Wasm SQL, CSV/Parquet analytics" },
+        { path: "plugins/sqlite.html", capability: "Local SQLite relational DB & offline storage" },
+        { path: "plugins/knowledge.html", capability: "RAG memory search, Markdown notes, Soul DB viewer" },
+        { path: "plugins/processmaker.html", capability: "ProcessMaker 3 BPMS workflow trigger & routing" },
+        { path: "plugins/supabase_manager.html", capability: "Supabase PostgreSQL & Storage CRUD manager" }
+      ]
+    },
+    "controllers/": {
+      role: "GAS Server-side API & Execution Bridges",
+      type: "SERVER_JS",
+      discovery_rule: "Scan exported functions and JSDoc @skill tags",
+      standard_files: [
+        { path: "controllers/api.gs", capability: "doGet/doPost entrypoints & ScriptProperties sync" },
+        { path: "controllers/bpmn_engine.gs", capability: "ProcessMaker 3 OAuth2 & REST API dispatcher" },
+        { path: "controllers/duckdb_analytics.gs", capability: "Server-side data aggregation & index sync" },
+        { path: "controllers/_system_bridge.gs", capability: "System introspection & capability catalog builder" }
+      ]
+    },
+    "views/": {
+      role: "Main Portal & Desktop IDE Views",
+      type: "HTML",
+      standard_files: [
+        { path: "views/index.html", capability: "Primary WebApp entry view" },
+        { path: "views/futari_no_ie.html", capability: "Cozy living room & personal portal" },
+        { path: "views/gas_web_ide_studio.html", capability: "Autonomous GAS Web IDE workstation" }
+      ]
+    },
+    "skills/": {
+      role: "AI Capability Catalog & Workflow Definitions",
+      type: "HTML_OR_JSON",
+      standard_files: [
+        { path: "skills/folder_structure.json", capability: "Standard directory blueprint for GenAI" },
+        { path: "skills/capabilities.json", capability: "Auto-generated catalog of available tools & functions" },
+        { path: "skills/bpmn_flows.json", capability: "ProcessMaker 3 pro_uid & tas_uid registry" }
+      ]
+    }
+  }
+};
+
+function getFileIcon(path) {
+  if (path.endsWith(".html")) return "🌐";
+  if (path.endsWith(".gs")) return "📄";
+  if (path.endsWith(".json")) return "⚙️";
+  return "📁";
+}
+
+function FolderCard({ name, info, files, isOpen, onToggle }) {
+  return (
+    <div className="folder-card">
+      <div className="folder-header" onClick={onToggle} style={{ borderBottom: isOpen ? undefined : "none" }}>
+        <div className="folder-left">
+          <span style={{ color: "#94a3b8", fontSize: 11 }}>{isOpen ? "▼" : "▶"}</span>
+          <span>📂</span>
+          <span className="folder-name">{name}</span>
+          <span className="folder-role">— {info.role}</span>
+        </div>
+        <div className="folder-meta">
+          <span className="type-pill">{info.type}</span>
+          <span className="badge">{files.length} files</span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <>
+          {info.discovery_rule && (
+            <div className="discovery-bar">🔍 Discovery Rule: {info.discovery_rule}</div>
+          )}
+          <ul className="file-list">
+            {files.map((file, idx) => (
+              <li key={file.path} className="file-item">
+                <div className="file-path">
+                  <span style={{ color: "#94a3b8" }}>{idx === files.length - 1 ? "└──" : "├──"}</span>
+                  <span>{getFileIcon(file.path)}</span>
+                  <strong>{file.path}</strong>
+                </div>
+                <div className="file-cap">{file.capability}</div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState({});
+  const [copied, setCopied] = useState(false);
+
+  const filteredFolders = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return Object.entries(INITIAL_BLUEPRINT.folders)
+      .map(([name, info]) => {
+        const files = info.standard_files.filter(f =>
+          !q ||
+          name.toLowerCase().includes(q) ||
+          info.role.toLowerCase().includes(q) ||
+          f.path.toLowerCase().includes(q) ||
+          f.capability.toLowerCase().includes(q)
+        );
+        return [name, info, files];
+      })
+      .filter(([, , files]) => files.length > 0);
+  }, [query]);
+
+  const setAllOpen = (open) => {
+    const next = {};
+    Object.keys(INITIAL_BLUEPRINT.folders).forEach(k => { next[k] = !open; });
+    setCollapsed(next);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(JSON.stringify(INITIAL_BLUEPRINT, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <div>
+      <div className="header">
+        <div className="title-wrap">
+          <h1>
+            📐 {INITIAL_BLUEPRINT.project_architecture}
+            <span className="badge">v{INITIAL_BLUEPRINT.schema_version}</span>
+            <span className="react-pill">⚛️ React 18 CDN</span>
+          </h1>
+          <div className="subtitle">1 GAS = 1 Project（Django的タスク分割・プラグイン構造規定書）</div>
+        </div>
+        <div className="actions">
+          <input
+            className="search"
+            placeholder="ファイル・役割を絞り込み..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button onClick={() => setAllOpen(true)}>全展開</button>
+          <button onClick={() => setAllOpen(false)}>全折畳</button>
+          <button onClick={handleCopy}>{copied ? "✅ コピー完了" : "📋 JSONコピー"}</button>
+        </div>
+      </div>
+
+      <div className="rule-banner">
+        <span><strong>原則① プロジェクト境界:</strong> 1 GAS = 1 業務ドメイン独立カプセル</span>
+        <span><strong>原則② タスク追加:</strong> 機能追加は各フォルダへの単一ファイル追加で疎結合維持</span>
+        <span><strong>原則③ 自動検出:</strong> 1行目の <code>&lt;!-- @skill --&gt;</code> / JSDoc でAIが自動認識</span>
+      </div>
+
+      <div className="tree-container">
+        {filteredFolders.map(([name, info, files]) => (
+          <FolderCard
+            key={name}
+            name={name}
+            info={info}
+            files={files}
+            isOpen={!collapsed[name]}
+            onToggle={() => setCollapsed(prev => ({ ...prev, [name]: !prev[name] }))}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!-- @skill {"name": "MyHomeStdio 4-Layer React SPA Architecture (Skills / Controller / Plugins / Views)", "path": "views/myhomestdio_spa.html", "triggers": ["4層SPA", "Reactテンプレート", "MyHomeStdio", "コンポーネント構成"], "entry": "App"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyHomeStdio 4-Layer React SPA</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1120;
+    --sidebar: #111827;
+    --panel: #1e293b;
+    --panel-hover: #273549;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --purple: #c084fc;
+    --rose: #fb7185;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .topbar {
+    height: 46px;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    flex-shrink: 0;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: var(--accent); }
+  .badge {
+    font-size: 10.5px; font-family: monospace; padding: 2px 7px; border-radius: 999px;
+    background: rgba(52, 211, 153, 0.14); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.3);
+  }
+  .btn {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 4px 10px; border-radius: 6px; font-size: 11.5px; cursor: pointer; transition: 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); color: var(--accent); }
+
+  .layout { display: flex; flex: 1; overflow: hidden; }
+  .nav-rail {
+    width: 220px; background: var(--sidebar); border-right: 1px solid var(--border);
+    padding: 10px 8px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; overflow-y: auto;
+  }
+  .layer-label {
+    font-size: 10px; font-family: monospace; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); padding: 6px 8px 2px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #cbd5e1;
+  }
+  .nav-item:hover { background: var(--panel); }
+  .nav-item.active {
+    background: rgba(56, 189, 248, 0.15); color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 600;
+  }
+
+  .stage { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .stage-body { flex: 1; padding: 16px; overflow-y: auto; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .card-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+  .box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px;
+  }
+  input, textarea, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 8px; border-radius: 6px; font-size: 12px; font-family: monospace;
+  }
+  .console {
+    height: 130px; background: #050811; border-top: 1px solid var(--border);
+    padding: 8px 12px; font-family: monospace; font-size: 11px; overflow-y: auto; flex-shrink: 0;
+  }
+  .log-line { margin-bottom: 3px; color: #94a3b8; }
+  .log-line strong { color: var(--green); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+/* ============================================================================
+   1. SKILLS LAYER (知識・規定・メタデータカタログ)
+   ============================================================================ */
+const SKILLS_REGISTRY = {
+  schema_version: "1.0.0",
+  architecture: "MyHomeStdio_4Layer_React_SPA",
+  layers: [
+    { id: "views", name: "Views / 統合ワークスペース", tag: "UI", desc: "全レイヤーを束ねる親画面" },
+    { id: "plugins", name: "Plugins / 機能家具スロット", tag: "MODULE", desc: "DuckDB・SQLite・BPMS等の独立機能" },
+    { id: "controllers", name: "Controllers / GAS・Colab通信", tag: "BRIDGE", desc: "Props同期・関数発火・GPU推論中継" },
+    { id: "skills", name: "Skills / 規定書・カタログ", tag: "SCHEMA", desc: "AIと人間が共有する構造定義" }
+  ],
+  standard_plugins: [
+    { id: "duckdb", title: "🦆 DuckDB-Wasm SQL", desc: "ブラウザ内高速SQL集計・Parquet/CSV解析" },
+    { id: "sqlite", title: "🗄️ Local SQLite", desc: "軽量リレーショナルDB・オフライン台帳" },
+    { id: "bpms", title: "⚙️ BPMS / n8n Relay", desc: "業務フロー起動・前後工程リレー制御" },
+    { id: "knowledge", title: "🧠 Knowledge / Soul DB", desc: "確定コンテキスト抽出・設計規定参照" }
+  ]
+};
+
+/* ============================================================================
+   2. CONTROLLER LAYER (GAS / Parent IDE / Colab 通信カスタムフック)
+   ============================================================================ */
+function useGasController(pushLog) {
+  const [propsData, setPropsData] = useState({
+    PROJECT_MODE: "1_GAS_1_PROJECT",
+    COLAB_TUNNEL: "https://*.trycloudflare.com",
+    DB_ENGINE: "DuckDB + SQLite"
+  });
+  const [busy, setBusy] = useState(false);
+
+  const invoke = useCallback((fnName, payload = {}) => {
+    setBusy(true);
+    pushLog(`CONTROLLER -> invoke("${fnName}")`, payload);
+
+    // 親IDE (postMessage) または GAS (google.script.run) への実通信ブリッジ
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "GAS_SKILL_CALL", fn: fnName, payload }, "*");
+      }
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            pushLog(`GAS_RESPONSE <- ${fnName}`, res);
+            setBusy(false);
+          })
+          .withFailureHandler((err) => {
+            pushLog(`GAS_ERROR <- ${fnName}`, String(err));
+            setBusy(false);
+          })[fnName](payload);
+        return;
+      }
+    } catch (e) {
+      pushLog("BRIDGE_FALLBACK", e.message);
+    }
+
+    setTimeout(() => {
+      pushLog(`LOCAL_SIM_OK <- ${fnName}`, { status: "ok", timestamp: new Date().toLocaleTimeString() });
+      setBusy(false);
+    }, 250);
+  }, [pushLog]);
+
+  return { propsData, setPropsData, invoke, busy };
+}
+
+/* ============================================================================
+   3. PLUGINS LAYER (差し替え・拡張可能な機能家具コンポーネント)
+   ============================================================================ */
+function PluginWorkspace({ activePluginId, setActivePluginId, controller, pushLog }) {
+  const [sqlText, setSqlText] = useState("SELECT * FROM tasks WHERE status = 'READY' LIMIT 10;");
+
+  return (
+    <div className="card">
+      <div className="card-title">🧩 Plugins Layer（独立機能スロット）</div>
+      <div className="grid-2" style={{ marginBottom: 12 }}>
+        {SKILLS_REGISTRY.standard_plugins.map((p) => (
+          <div
+            key={p.id}
+            className="box"
+            onClick={() => setActivePluginId(p.id)}
+            style={{
+              cursor: "pointer",
+              borderColor: activePluginId === p.id ? "var(--accent)" : "var(--border)",
+              background: activePluginId === p.id ? "rgba(56,189,248,0.08)" : "var(--bg)"
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "var(--amber)", marginBottom: 4 }}>{p.title}</div>
+            <div style={{ color: "var(--muted)", fontSize: 11.5 }}>{p.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 選択中プラグインの実行パネル */}
+      <div className="box">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <strong style={{ color: "var(--accent)" }}>Active Plugin: {activePluginId.toUpperCase()}</strong>
+          <button
+            className="btn primary"
+            onClick={() => controller.invoke(`run_${activePluginId}`, { query: sqlText })}
+          >
+            ▶ Controller経由で実行
+          </button>
+        </div>
+        <textarea rows={3} value={sqlText} onChange={(e) => setSqlText(e.target.value)} />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+   4. VIEWS LAYER (全体統合ワークスペース)
+   ============================================================================ */
+function App() {
+  const [activeLayer, setActiveLayer] = useState("views");
+  const [activePluginId, setActivePluginId] = useState("duckdb");
+  const [logs, setLogs] = useState([
+    { time: new Date().toLocaleTimeString(), tag: "SYSTEM_BOOT", detail: "4-Layer React SPA initialized." }
+  ]);
+
+  const pushLog = useCallback((tag, detail) => {
+    setLogs((prev) => [
+      { time: new Date().toLocaleTimeString(), tag, detail: typeof detail === "string" ? detail : JSON.stringify(detail) },
+      ...prev.slice(0, 29)
+    ]);
+  }, []);
+
+  const controller = useGasController(pushLog);
+
+  const exportScaffold = () => {
+    navigator.clipboard.writeText(JSON.stringify(SKILLS_REGISTRY, null, 2));
+    pushLog("SKILLS_EXPORT", "Architecture JSON copied to clipboard.");
+  };
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="brand">
+          <span>🏛️ MyHomeStdio 4-Layer SPA</span>
+          <span className="badge">⚛️ React 18 Single-HTML</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={() => controller.invoke("apiGetScriptProperties")}>📥 Props取得</button>
+          <button className="btn" onClick={() => controller.invoke("apiSaveScriptProperties", controller.propsData)}>💾 GAS保存</button>
+          <button className="btn primary" onClick={exportScaffold}>📋 規定JSONコピー</button>
+        </div>
+      </header>
+
+      <div className="layout">
+        {/* Left Navigation: 4 Architecture Layers */}
+        <aside className="nav-rail">
+          <div className="layer-label">4-Layer Components</div>
+          {SKILLS_REGISTRY.layers.map((layer) => (
+            <div
+              key={layer.id}
+              className={`nav-item ${activeLayer === layer.id ? "active" : ""}`}
+              onClick={() => setActiveLayer(layer.id)}
+            >
+              <span>{layer.name.split(" / ")[0]}</span>
+              <span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--purple)" }}>{layer.tag}</span>
+            </div>
+          ))}
+
+          <div className="layer-label" style={{ marginTop: 10 }}>Quick Plugins</div>
+          {SKILLS_REGISTRY.standard_plugins.map((p) => (
+            <div
+              key={p.id}
+              className={`nav-item ${activeLayer === "plugins" && activePluginId === p.id ? "active" : ""}`}
+              onClick={() => { setActiveLayer("plugins"); setActivePluginId(p.id); }}
+            >
+              <span>{p.title}</span>
+            </div>
+          ))}
+        </aside>
+
+        {/* Center Main View */}
+        <main className="stage">
+          <div className="stage-body">
+            {(activeLayer === "views" || activeLayer === "plugins") && (
+              <PluginWorkspace
+                activePluginId={activePluginId}
+                setActivePluginId={setActivePluginId}
+                controller={controller}
+                pushLog={pushLog}
+              />
+            )}
+
+            {(activeLayer === "views" || activeLayer === "controllers") && (
+              <div className="card">
+                <div className="card-title">🔌 Controllers Layer（ScriptProperties & GAS/Colab Bridge）</div>
+                <div className="grid-2">
+                  {Object.entries(controller.propsData).map(([k, v]) => (
+                    <div key={k} className="box">
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>{k}</div>
+                      <input
+                        value={v}
+                        onChange={(e) => controller.setPropsData((prev) => ({ ...prev, [k]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(activeLayer === "views" || activeLayer === "skills") && (
+              <div className="card">
+                <div className="card-title">📐 Skills Layer（1 GAS = 1 Project 構造規定カタログ）</div>
+                <pre className="box" style={{ overflowX: "auto", color: "#cbd5e1" }}>
+                  {JSON.stringify(SKILLS_REGISTRY, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Live Event Log */}
+          <div className="console">
+            {logs.map((l, idx) => (
+              <div key={idx} className="log-line">
+                [{l.time}] <strong>{l.tag}</strong>: {l.detail}
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

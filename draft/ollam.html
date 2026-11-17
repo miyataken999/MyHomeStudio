@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Python REPL + LocalDB + Ollama T4 GPU LLM</title>
+  <style>
+    body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; padding: 14px; margin: 0; font-size: 13px; }
+    h3 { color: #38bdf8; margin: 0 0 8px; font-size: 15px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .status { font-size: 12px; color: #fbbf24; margin-bottom: 6px; }
+    .status.ready { color: #34d399; }
+    textarea, input, select {
+      width: 100%; box-sizing: border-box; background: #0f172a; color: #e2e8f0;
+      border: 1px solid #475569; border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 12px;
+    }
+    textarea { height: 85px; }
+    .bar { display: flex; gap: 8px; margin: 8px 0; align-items: center; flex-wrap: wrap; }
+    button {
+      background: #0284c7; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 14px; font-weight: 600; cursor: pointer; font-size: 12px;
+    }
+    button.purple { background: #7c3aed; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    pre {
+      background: #020617; color: #a7f3d0; border: 1px solid #1e293b;
+      border-radius: 6px; padding: 10px; min-height: 55px; max-height: 190px; overflow-y: auto;
+      margin: 0; font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>🐍 1. Python REPL + ローカルDB（Knowledge抽出）</h3>
+    <div id="py-status" class="status ready">✅ 初期ナレッジセット済（▶ Python実行 でSQLiteクエリ実行）</div>
+    <textarea id="py-code" spellcheck="false">rows = con.execute("SELECT topic, body FROM knowledge").fetchall()
+ctx = "\n".join([f"- {t}: {b}" for t, b in rows])
+print(ctx)</textarea>
+    <div class="bar">
+      <button id="run-btn" onclick="runPyRepl()">▶ Python実行 (SQLite)</button>
+      <span style="font-size:11px;color:#94a3b8;">※出力が下の Ollama T4 GPU LLM の知識(Context)に自動連携！</span>
+    </div>
+    <pre id="py-out">- BPMS仕様: 1タスク1プラグイン構成で自己完結する設計
+- LocalLLM: Colab T4 GPU(Ollama)とブラウザ内DBでAPI費用0円を実現</pre>
+  </div>
+
+  <div class="card">
+    <h3>🚀 2. Ollama T4 GPU Local LLM（Cloudflare自動連携・API代0円）</h3>
+    <div id="llm-status" class="status">🔍 接続確認中...</div>
+    <div class="bar">
+      <input id="ollama-url" type="text" style="flex:2;" value="https://motel-barely-qualifying-hired.trycloudflare.com" />
+      <select id="model-select" style="flex:1;">
+        <option value="qwen2.5:3b">qwen2.5:3b</option>
+      </select>
+      <button class="purple" onclick="checkOllama()">🔄 接続確認</button>
+    </div>
+    <div class="bar">
+      <input id="llm-prompt" type="text" value="上のDB知識をもとに、このシステムの構成を1文で説明して" />
+      <button id="ask-llm-btn" onclick="askOllama()">💬 T4 GPU推論</button>
+    </div>
+    <pre id="llm-out" style="color:#e0e7ff;">（ここに Ollama T4 GPU の応答がストリーミング表示されます）</pre>
+  </div>
+
+  <script>
+    let pyodide = null;
+
+    async function ensurePyodide() {
+      if (pyodide) return pyodide;
+      const st = document.getElementById("py-status");
+      st.className = "status";
+      st.textContent = "⏳ 初回のみ Pyodide + SQLite ロード中...";
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/" });
+      await pyodide.loadPackage("sqlite3");
+      await pyodide.runPythonAsync(`
+import sqlite3, sys, io, traceback
+con = sqlite3.connect(":memory:")
+con.execute("CREATE TABLE knowledge (id INT, topic TEXT, body TEXT)")
+con.execute("INSERT INTO knowledge VALUES (1, 'BPMS仕様', '1タスク1プラグイン構成で自己完結する設計'), (2, 'LocalLLM', 'Colab T4 GPU(Ollama)とブラウザ内DBでAPI費用0円を実現')")
+con.commit()
+
+def exec_repl(code_str):
+    buf = io.StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    sys.stdout = sys.stderr = buf
+    try:
+        exec(code_str, globals())
+    except Exception:
+        traceback.print_exc()
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+    return buf.getvalue() or "✅ 実行完了（出力なし）"
+`);
+      st.textContent = "✅ Python + SQLite Ready!";
+      st.className = "status ready";
+      return pyodide;
+    }
+
+    async function runPyRepl() {
+      const btn = document.getElementById("run-btn");
+      btn.disabled = true;
+      try {
+        const py = await ensurePyodide();
+        const code = document.getElementById('py-code').value;
+        py.globals.set("_user_code", code);
+        document.getElementById('py-out').textContent = await py.runPythonAsync("exec_repl(_user_code)");
+      } catch (err) {
+        document.getElementById('py-out').textContent = "❌ エラー: " + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function checkOllama() {
+      const base = document.getElementById("ollama-url").value.replace(/\/$/, "");
+      const st = document.getElementById("llm-status");
+      const sel = document.getElementById("model-select");
+      st.className = "status";
+      st.textContent = "⏳ 接続中...";
+      try {
+        const res = await fetch(base + "/api/tags");
+        const data = await res.json();
+        if (data.models && data.models.length > 0) {
+          sel.innerHTML = data.models.map(m => `<option value="${m.name}">${m.name}</option>`).join("");
+          st.textContent = `✅ Ollama T4 GPU 接続成功！（${data.models.length}モデル利用可能）`;
+          st.className = "status ready";
+        }
+      } catch (err) {
+        st.textContent = "❌ 接続エラー: " + err.message;
+      }
+    }
+
+    async function askOllama() {
+      const base = document.getElementById("ollama-url").value.replace(/\/$/, "");
+      const model = document.getElementById("model-select").value;
+      const out = document.getElementById("llm-out");
+      const btn = document.getElementById("ask-llm-btn");
+      const kbContext = document.getElementById("py-out").textContent;
+      const userPrompt = document.getElementById("llm-prompt").value;
+
+      btn.disabled = true;
+      out.textContent = "🚀 T4 GPU で推論中...";
+      try {
+        const res = await fetch(base + "/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: "system", content: "あなたは優秀な日本語アシスタントです。以下のローカルDB知識を参考に簡潔に回答してください。\n\n【ローカルDB知識】\n" + kbContext },
+              { role: "user", content: userPrompt }
+            ],
+            stream: true,
+            keep_alive: "60m"
+          })
+        });
+
+        if (!res.ok) throw new Error("HTTP " + res.status + ": " + await res.text());
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        out.textContent = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const obj = JSON.parse(line);
+              if (obj.message && obj.message.content) {
+                out.textContent += obj.message.content;
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        out.textContent = "❌ 推論エラー: " + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    checkOllama();
+  </script>
+</body>
+</html>

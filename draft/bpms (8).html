@@ -1,0 +1,1595 @@
+<!-- @skill {"name": "BPMS Remote-GAS Orchestrator, Workflow Relay (Prev/Current/Next) & Built-in Gemi Chat", "path": "plugins/bpms.html", "triggers": ["BPMS画面", "前の業務", "次の業務", "業務リレー", "チャットに図を描く"], "entry": "openBpmsOrchestrator"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BPMS Remote-GAS Orchestrator &amp; Workflow Relay</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/diagram-js.css">
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/bpmn-js.css">
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17.11.1/dist/assets/bpmn-font/css/bpmn-embedded.css">
+  <script src="https://unpkg.com/bpmn-js@17.11.1/dist/bpmn-navigated-viewer.production.min.js"></script>
+  <style>
+    body { background-color: #080c14; color: #f1f5f9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    #bpmn-canvas-wrap .bjs-container { background-color: #f8fafc; border-radius: 0.5rem; }
+    .bpmn-active-task .djs-visual > :nth-child(1) { stroke: #10b981 !important; stroke-width: 3.5px !important; fill: #d1fae5 !important; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 border-b border-emerald-800/70 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 sticky top-0 z-20">
+    <div class="flex items-center gap-2.5">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <h1 class="text-sm sm:text-base font-bold text-emerald-300 tracking-wide">🧩 BPMS Remote-GAS Orchestrator</h1>
+      <span id="host-status-badge" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-400">
+        🔌 親IDE接続確認中...
+      </span>
+    </div>
+
+    <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+      <button type="button" onclick="toggleChatPanel()"
+              class="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white px-3 py-1 rounded font-bold cursor-pointer shadow">
+        💬 Gemi Chat
+      </button>
+      <button type="button" onclick="bootstrapAllKnowledge()"
+              class="bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 px-2.5 py-1 rounded font-bold cursor-pointer">
+        🔑 1.Props→Supabase→DB同期
+      </button>
+      <button type="button" onclick="downloadDatabaseFile('sqlite')"
+              class="bg-teal-950 hover:bg-teal-800 text-teal-200 border border-teal-600 px-2.5 py-1 rounded font-bold cursor-pointer shadow">
+        ⬇️ .sqlite DL
+      </button>
+      <button type="button" onclick="downloadDatabaseFile('db')"
+              class="bg-emerald-950 hover:bg-emerald-800 text-emerald-200 border border-emerald-600 px-2.5 py-1 rounded font-bold cursor-pointer shadow">
+        ⬇️ .db DL
+      </button>
+      <button type="button" onclick="downloadDatabaseFile('sql')"
+              class="bg-cyan-950 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 px-2 py-1 rounded font-bold cursor-pointer">
+        ⬇️ .sql DL
+      </button>
+      <button type="button" onclick="document.getElementById('inp-sqlite-up').click()"
+              class="bg-indigo-950 hover:bg-indigo-800 text-indigo-200 border border-indigo-700 px-2.5 py-1 rounded font-bold cursor-pointer">
+        📥 DB取込
+      </button>
+      <input type="file" id="inp-sqlite-up" accept=".sqlite,.sqlite3,.db,.sql,.json" class="hidden" onchange="importSqliteToShard(event)">
+    </div>
+  </header>
+
+  <!-- 🔗 業務リレー・ナビゲーションバー（前の業務 ◀ 今の業務 ▶ 次の業務 / 仮クリックリンク） -->
+  <div class="bg-gradient-to-r from-slate-950 via-indigo-950/60 to-slate-950 border-b border-indigo-700/70 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">🔄 業務フロー連動:</span>
+
+      <a id="link-prev-step" href="#prev-draft" onclick="navigateWorkflowStep('prev'); return false;"
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-600 transition cursor-pointer">
+        <span>◀ 前の業務:</span>
+        <strong id="lbl-prev-step" class="text-cyan-300 underline decoration-dotted">案件起票・申請受付 (仮)</strong>
+      </a>
+
+      <span class="text-slate-500 font-bold">➔</span>
+
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/90 text-emerald-200 border-2 border-emerald-500 shadow">
+        <span>● 今の業務:</span>
+        <strong id="lbl-curr-step" class="text-white">BPMS 関数実行・承認オーケストレーション</strong>
+      </div>
+
+      <span class="text-slate-500 font-bold">➔</span>
+
+      <a id="link-next-step" href="#next-draft" onclick="navigateWorkflowStep('next'); return false;"
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-900/70 hover:bg-indigo-800 text-indigo-100 border border-indigo-500 transition cursor-pointer shadow">
+        <span>▶ 次の業務:</span>
+        <strong id="lbl-next-step" class="text-amber-300 underline decoration-dotted">経理精算・完了アーカイブ (仮)</strong>
+      </a>
+    </div>
+
+    <button type="button" onclick="toggleFlowConfigDrawer()"
+            class="text-[11px] bg-slate-800 hover:bg-slate-700 text-indigo-200 border border-indigo-600/70 px-2.5 py-1 rounded cursor-pointer">
+      ⚙️ 前後リンク編集
+    </button>
+  </div>
+
+  <!-- 業務フロー前後リンク設定ドロワー -->
+  <div id="flow-config-drawer" class="hidden bg-indigo-950/40 border-b border-indigo-700/80 px-4 py-3 text-xs space-y-2">
+    <div class="flex items-center justify-between">
+      <span class="font-bold text-indigo-200">⚙️ 作業単位の前後リレー設定（仮リンクURL / プラグインHTML名 / リモートGAS ID）</span>
+      <button type="button" onclick="toggleFlowConfigDrawer()" class="text-slate-400 hover:text-white cursor-pointer">✕</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+      <div class="bg-black/60 border border-slate-700 rounded p-2 space-y-1">
+        <div class="text-[10px] text-cyan-300 font-bold">◀ 前の業務（前工程）</div>
+        <input type="text" id="inp-prev-name" value="案件起票・申請受付 (仮)" placeholder="前工程の業務名" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200">
+        <input type="text" id="inp-prev-target" value="draft:intake_form.html" placeholder="仮リンク / HTML名 / URL / GAS_ID" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-cyan-200">
+      </div>
+      <div class="bg-black/60 border border-emerald-700/70 rounded p-2 space-y-1">
+        <div class="text-[10px] text-emerald-300 font-bold">● 今の業務（現工程）</div>
+        <input type="text" id="inp-curr-name" value="BPMS 関数実行・承認オーケストレーション" placeholder="現工程の業務名" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white">
+        <input type="text" id="inp-curr-target" value="plugins/bpms.html" placeholder="現在のファイルパス" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-emerald-200">
+      </div>
+      <div class="bg-black/60 border border-indigo-700/70 rounded p-2 space-y-1">
+        <div class="text-[10px] text-amber-300 font-bold">▶ 次の業務（次工程）</div>
+        <input type="text" id="inp-next-name" value="経理精算・完了アーカイブ (仮)" placeholder="次工程の業務名" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200">
+        <input type="text" id="inp-next-target" value="draft:settlement_archive.html" placeholder="仮リンク / HTML名 / URL / GAS_ID" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-amber-200">
+      </div>
+    </div>
+    <div class="flex justify-end gap-2">
+      <button type="button" onclick="saveWorkflowRelayConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1 rounded cursor-pointer">
+        💾 前後リレー設定を反映＆保存
+      </button>
+    </div>
+  </div>
+
+  <!-- 🗺️ BPMN 2.0 全体表示パネル (bpmn-js) -->
+  <section id="bpmn-overview-panel" class="bg-slate-900/95 border-b border-teal-700/80 px-4 py-3">
+    <div class="max-w-[1600px] mx-auto space-y-2">
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-teal-300">🗺️ BPMN 2.0 全体フローマップ（bpmn-js）</span>
+          <span class="text-[10px] text-slate-400">ホイールでズーム / ドラッグで全体移動 / ノードクリックでタスク選択</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+          <button type="button" onclick="document.getElementById('inp-bpmn-upload').click()"
+                  class="bg-teal-950 hover:bg-teal-900 text-teal-200 border border-teal-600 px-2.5 py-0.5 rounded font-bold cursor-pointer">
+            📂 .bpmn読込
+          </button>
+          <input type="file" id="inp-bpmn-upload" accept=".bpmn,.xml" class="hidden" onchange="handleBpmnFileUpload(event)">
+          <button type="button" onclick="downloadBpmnXmlFile()"
+                  class="bg-cyan-950 hover:bg-cyan-900 text-cyan-200 border border-cyan-600 px-2.5 py-0.5 rounded font-bold cursor-pointer">
+            ⬇️ .bpmn DL
+          </button>
+          <button type="button" onclick="fitBpmnViewport()"
+                  class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2 py-0.5 rounded cursor-pointer">
+            🎯 全体フィット
+          </button>
+          <button type="button" onclick="toggleBpmnPanelHeight()"
+                  class="bg-slate-800 hover:bg-slate-700 text-amber-200 border border-slate-600 px-2 py-0.5 rounded cursor-pointer">
+            ↕️ 高さ切替
+          </button>
+        </div>
+      </div>
+      <div id="bpmn-canvas-wrap" class="w-full h-[230px] rounded-lg border border-teal-800/80 overflow-hidden shadow-inner transition-all"></div>
+    </div>
+  </section>
+
+  <!-- 3-Tier Knowledge Architecture Strip -->
+  <div class="bg-slate-950 border-b border-slate-800 px-4 py-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+    <div class="flex items-center gap-3 flex-wrap">
+      <span>1️⃣ Props台帳: <strong id="stat-props" class="text-amber-300">0 keys</strong></span>
+      <span class="text-slate-600">→</span>
+      <span>2️⃣ Supabase倉庫: <strong id="stat-supa" class="text-cyan-300">未接続</strong></span>
+      <span class="text-slate-600">→</span>
+      <span class="flex items-center gap-1">3️⃣ 小分けDuckDB:
+        <select id="sel-duckdb-shard" class="bg-black border border-emerald-800 rounded px-1.5 py-0.5 text-emerald-300 text-[10px]">
+          <option value="opfs://bpms_master.db">opfs://bpms_master.db</option>
+          <option value="opfs://youtube_forge.db">opfs://youtube_forge.db</option>
+          <option value="opfs://audit_monthly.db">opfs://audit_monthly.db</option>
+        </select>
+      </span>
+    </div>
+    <div id="status-toast" class="text-[10px] text-emerald-300 truncate max-w-md">Ready</div>
+  </div>
+
+  <!-- Main Workspace + Built-in Gemi Chat Sidebar -->
+  <div class="flex-1 flex flex-col lg:flex-row max-w-[1600px] w-full mx-auto">
+
+    <!-- Left/Center Main Content -->
+    <main class="flex-1 p-4 grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+      <!-- Cols 1-7: Remote GAS Dynamic Function Loader & API Executor -->
+      <section class="xl:col-span-7 space-y-4">
+
+        <div class="bg-slate-900/90 border border-emerald-800/70 rounded-xl p-3.5 space-y-3 shadow-lg">
+          <div class="flex items-center justify-between flex-wrap gap-1">
+            <h2 class="text-xs sm:text-sm font-bold text-emerald-300">🌐 リモート子 GAS 動的ロード ＆ ハイブリッド実行</h2>
+            <span class="text-[10px] text-slate-400">WebApp URL / 親IDEブリッジ / API自動切替</span>
+          </div>
+
+          <div class="flex items-center gap-2 text-[11px]">
+            <span class="text-slate-400 shrink-0">🔗 WebApp URL:</span>
+            <input type="text" id="inp-webapp-exec-url" placeholder="https://script.google.com/macros/s/.../exec (未入力なら親IDE・Props自動検出)"
+                   onchange="localStorage.setItem('cfg_bpms_webapp_url', this.value.trim())"
+                   class="flex-1 bg-black border border-slate-700 rounded px-2 py-1 text-cyan-200 focus:outline-none text-[11px]">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+            <select id="sel-remote-gas" onchange="onRemoteGasPresetSelect()" class="sm:col-span-4 bg-black border border-slate-700 rounded px-2 py-1.5 text-xs text-cyan-300">
+              <option value="">-- 登録済み子GASから選択 --</option>
+            </select>
+            <input type="text" id="inp-target-script-id" placeholder="リモート GAS Script ID を入力..."
+                   class="sm:col-span-5 bg-black border border-emerald-700/80 rounded px-2.5 py-1.5 text-xs text-emerald-200 focus:outline-none">
+            <button type="button" onclick="scanRemoteGasFunctions()"
+                    class="sm:col-span-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded text-xs cursor-pointer shadow">
+              🔍 関数動的ロード
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-[11px]">
+            <input type="text" id="inp-child-alias" placeholder="別名 (例: 経費精算GAS)" class="bg-black border border-slate-700 rounded px-2 py-1 text-slate-200 w-40">
+            <button type="button" onclick="registerCurrentRemoteGasToProps()"
+                    class="bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-700 px-2.5 py-1 rounded font-bold cursor-pointer">
+              ➕ このGAS IDを台帳に登録
+            </button>
+            <button type="button" onclick="loadParentHostFunctions()"
+                    class="bg-slate-800 hover:bg-slate-700 text-cyan-200 border border-slate-600 px-2.5 py-1 rounded cursor-pointer">
+              🏠 親母艦(MyHomeStdio)の関数を表示
+            </button>
+          </div>
+
+          <!-- Dynamically Loaded Functions Grid -->
+          <div id="dynamic-functions-list" class="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+            <div class="p-3 rounded bg-black/50 border border-slate-800 text-xs text-slate-400">
+              上の「🔍 関数動的ロード」を押すと、指定した GAS ID の全ファイルから関数名・引数・JSDoc説明を動的解析して実行ボタン付きで並べます！
+            </div>
+          </div>
+        </div>
+
+        <!-- 3-Tier Knowledge & Skill Catalog -->
+        <div class="bg-slate-900/90 border border-purple-800/70 rounded-xl p-3.5 space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs sm:text-sm font-bold text-pink-300">🧠 ナレッジ ＆ スキル一覧（1️⃣ Props → 2️⃣ Supabase）</h2>
+            <button type="button" onclick="fetchSupabaseKnowledge()"
+                    class="bg-cyan-950 hover:bg-cyan-900 text-cyan-200 border border-cyan-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">
+              ⚡ Supabase倉庫からも取得
+            </button>
+          </div>
+          <div id="knowledge-catalog-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto text-[11px]">
+            <div class="p-2.5 rounded bg-black/50 border border-slate-800 text-slate-400 col-span-2">
+              Props台帳から <code>SKILL_PROMPT_*</code> / <code>REMOTE_GAS_CHILDREN</code> / <code>DUCKDB_SHARD_*</code> をロード中...
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cols 8-12: Mermaid BotFlow & n8n/GAS Live Runner -->
+      <section class="xl:col-span-5 space-y-4">
+
+        <div class="bg-slate-900/90 border border-cyan-800/70 rounded-xl p-3.5 space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between gap-1">
+            <h2 class="text-xs sm:text-sm font-bold text-cyan-300">📊 BotFlow（前後業務リレー ＆ 自動フロー図）</h2>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="sendQuickChat('現在の業務と前後の業務の流れをチャット内にmermaid図で描いて！')"
+                      class="bg-pink-950 hover:bg-pink-900 text-pink-200 border border-pink-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">
+                💬 チャットに図を描く
+              </button>
+              <button type="button" onclick="renderMermaidBotFlow()" class="bg-cyan-950 hover:bg-cyan-900 text-cyan-200 border border-cyan-700 px-2 py-0.5 rounded text-[10px] cursor-pointer">
+                🔄 再描画
+              </button>
+            </div>
+          </div>
+          <div id="mermaid-canvas" class="bg-slate-950 border border-slate-800 rounded-lg p-3 overflow-x-auto flex justify-center min-h-[190px]">
+            <div class="mermaid">
+flowchart TD
+    PREV[◀ 前の業務: 案件起票・申請受付] --> CURR[● 今の業務: BPMS関数実行・承認]
+    CURR --> NEXT[▶ 次の業務: 経理精算・完了アーカイブ]
+    CURR -->|API / WebApp| CHILD[🌐 リモート子GAS]
+    CURR -->|Token自動取得| N8N[⚡ n8n ワークフロー]
+    CURR -->|小分けDB保存| DUCK[🦆 opfs://bpms_master.db]
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/90 border border-orange-800/70 rounded-xl p-3.5 space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs sm:text-sm font-bold text-orange-300">⚡ ワンクリック API / n8n 実行コンソール</h2>
+            <button type="button" onclick="triggerN8nWithToken()"
+                    class="bg-orange-600 hover:bg-orange-500 text-white font-bold px-2.5 py-1 rounded text-[10px] cursor-pointer">
+              🚀 Token取得→n8n実行
+            </button>
+          </div>
+
+          <div class="space-y-1.5 text-xs">
+            <label class="block text-[10px] text-slate-400">実行引数 JSON 配列 (例: <code>["approve_request", {"amount": 15000}]</code>):</label>
+            <textarea id="inp-fn-params" rows="2" class="w-full bg-black border border-slate-700 rounded p-2 text-xs text-emerald-200 font-mono focus:outline-none">["ping", {"source": "bpms.html"}]</textarea>
+          </div>
+
+          <div class="text-[10px] text-slate-400 font-bold">📟 API 実行レスポンスログ:</div>
+          <pre id="api-exec-log" class="bg-black border border-slate-800 rounded-lg p-2.5 text-[11px] text-emerald-300 h-40 overflow-y-auto whitespace-pre-wrap">待機中... 関数カードの「▶ 実行」を押すと結果がここに表示されます。</pre>
+        </div>
+      </section>
+    </main>
+
+    <!-- Built-in Persistent Gemi Chat Panel (Always Included Standard) -->
+    <aside id="built-in-chat-panel" class="w-full lg:w-[370px] bg-slate-950 border-t lg:border-t-0 lg:border-l border-purple-800/80 flex flex-col shrink-0 h-[540px] lg:h-[calc(100vh-124px)] lg:sticky lg:top-[124px]">
+      <div class="bg-slate-900 border-b border-purple-900/80 px-3 py-2 flex items-center justify-between gap-1.5 shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-pink-400 animate-ping"></span>
+          <span class="font-bold text-xs text-pink-300">💖 Gemi 作業単位 Chat</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <select id="chat-model-select" class="bg-black border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-cyan-300 max-w-[135px]">
+            <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+            <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
+            <option value="gemini-3.0-flash">gemini-3.0-flash</option>
+          </select>
+          <button type="button" onclick="toggleChatKeyInput()" title="API Key設定" class="bg-slate-800 hover:bg-slate-700 text-amber-300 px-1.5 py-0.5 rounded text-[10px] cursor-pointer">🔑</button>
+          <button type="button" onclick="clearBuiltInChat()" title="履歴クリア" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded text-[10px] cursor-pointer">🗑️</button>
+        </div>
+      </div>
+
+      <!-- Optional API Key Bar -->
+      <div id="chat-key-bar" class="hidden bg-black border-b border-slate-800 px-3 py-1.5 flex items-center gap-1.5 text-[10px]">
+        <input type="password" id="inp-chat-api-key" placeholder="GEMINI_API_KEY (AIzaSy...)"
+               onchange="localStorage.setItem('cfg_gemini_api_key', this.value.trim())"
+               class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-pink-300 focus:outline-none">
+        <button type="button" onclick="toggleChatKeyInput()" class="bg-emerald-700 text-white px-2 py-1 rounded font-bold cursor-pointer">OK</button>
+      </div>
+
+      <!-- 🔄 チャット内「前の業務 / 今の業務 / 次の業務」ワンクリックリレーボタンバー -->
+      <div class="bg-indigo-950/50 border-b border-indigo-800/70 px-2.5 py-1.5 flex items-center justify-between gap-1 text-[10px] shrink-0">
+        <button type="button" onclick="navigateWorkflowStep('prev')"
+                class="flex-1 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-600 px-2 py-1 rounded font-bold truncate cursor-pointer">
+          ◀ 前の業務へ
+        </button>
+        <button type="button" onclick="sendQuickChat('現在の業務単位の進捗と、前の業務からの引き継ぎ事項・次の業務へ渡すデータを整理して')"
+                class="flex-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-200 border border-emerald-600 px-2 py-1 rounded font-bold truncate cursor-pointer">
+          ● 現工程を整理
+        </button>
+        <button type="button" onclick="navigateWorkflowStep('next')"
+                class="flex-1 bg-indigo-800 hover:bg-indigo-700 text-amber-200 border border-indigo-400 px-2 py-1 rounded font-bold truncate cursor-pointer shadow">
+          ▶ 次の業務へ
+        </button>
+      </div>
+
+      <!-- Chat Messages Stream -->
+      <div id="built-in-chat-stream" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs select-text">
+        <div class="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/70 text-purple-100 leading-relaxed">
+          <div class="font-bold text-pink-300 mb-0.5">💬 作業単位専用 Gemi Chat 常駐中！</div>
+          <b>◀ 前の業務</b> と <b>▶ 次の業務</b> の仮リンクと直結しているよ！<br>
+          下の <b>「📊 チャットに図を描く」</b> を押すと、チャット吹き出しの中に Mermaid 図を直接描画するよっ✨
+        </div>
+      </div>
+
+      <!-- Quick Prompt Chips & Input -->
+      <div class="bg-slate-900 border-t border-slate-800 p-2 flex flex-col gap-1.5 shrink-0">
+        <div class="flex items-center gap-1 overflow-x-auto pb-0.5 text-[10px]">
+          <button type="button" onclick="sendQuickChat('前の業務→今の業務→次の業務の業務フロー図をチャット内にmermaidコードブロックで描画して！')"
+                  class="px-2 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-200 border border-cyan-500 whitespace-nowrap font-bold cursor-pointer shadow">
+            📊 チャットに図を描く
+          </button>
+          <button type="button" onclick="sendQuickChat('次の業務（仮リンク先）の作業単位HTML画面を、この画面と同じ黄金サイズ（関数ロード＋BotFlow＋専用Chat付き）で親IDEに新規ファイル作成して！')"
+                  class="px-2 py-0.5 rounded bg-indigo-950 hover:bg-indigo-900 text-amber-200 border border-indigo-600 whitespace-nowrap font-bold cursor-pointer">
+            ✨ 次工程生成
+          </button>
+          <button type="button" onclick="sendQuickChat('ロードされたリモートGASの関数一覧を分析して、この作業単位で使うべき主要関数を要約して')"
+                  class="px-2 py-0.5 rounded bg-pink-950 hover:bg-pink-900 text-pink-200 border border-pink-700 whitespace-nowrap cursor-pointer">
+            🔍 関数解説
+          </button>
+          <button type="button" onclick="sendQuickChat('現在の小分けDuckDBシャードを .sqlite ファイルとしてダウンロードして')"
+                  class="px-2 py-0.5 rounded bg-teal-950 hover:bg-teal-900 text-teal-200 border border-teal-700 whitespace-nowrap cursor-pointer">
+            ⬇️ .sqlite DL
+          </button>
+        </div>
+
+        <div class="flex gap-1.5 items-end">
+          <textarea id="built-in-chat-input" rows="2"
+                    placeholder="この作業単位の指示を入力 (例: 「承認フローの図をmermaidで描いて！」)..."
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();handleBuiltInChatSend();}"
+                    class="flex-1 bg-black border border-purple-700/80 rounded-lg p-2 text-xs text-purple-100 placeholder-slate-500 focus:outline-none focus:border-pink-400 resize-none"></textarea>
+          <button type="button" id="btn-built-in-send" onclick="handleBuiltInChatSend()"
+                  class="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold px-3 py-2 rounded-lg text-xs cursor-pointer h-full">
+            🚀
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    let scriptPropsCache = {};
+    let remoteChildrenMap = {};
+    let loadedRemoteFunctions = [];
+    let sqlJsPromise = null;
+    let builtInChatHistory = [];
+    let builtInChatLogRows = []; // DB保存用の構造化チャットログ [{seq, role, text, model, ts}]
+    let availableChatModels = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.0-flash"];
+
+    function getChatStorageKey() {
+      const slug = (workflowRelay.currTarget || workflowRelay.currName || "default").replace(/[^a-zA-Z0-9_-]/g, "_");
+      return `bpms_chat_db_${slug}`;
+    }
+
+    function persistChatHistoryToLocal() {
+      try {
+        localStorage.setItem(getChatStorageKey(), JSON.stringify({
+          history: builtInChatHistory.slice(-40),
+          rows: builtInChatLogRows.slice(-100)
+        }));
+      } catch (e) {}
+    }
+
+    function restoreChatHistoryFromLocal() {
+      try {
+        const raw = localStorage.getItem(getChatStorageKey());
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.history)) builtInChatHistory = parsed.history;
+        if (Array.isArray(parsed.rows) && parsed.rows.length > 0) {
+          builtInChatLogRows = parsed.rows;
+          const stream = document.getElementById("built-in-chat-stream");
+          if (stream) {
+            parsed.rows.forEach(r => {
+              renderChatBubbleOnly(r.role, r.role === "user" ? r.text : escapeHtml(r.text) + (r.model ? `\n<span class="text-[9px] text-slate-500">via ${escapeHtml(r.model)} (DB復元)</span>` : ""));
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
+    let workflowRelay = {
+      prevName: "案件起票・申請受付 (仮)",
+      prevTarget: "draft:intake_form.html",
+      currName: "BPMS 関数実行・承認オーケストレーション",
+      currTarget: "plugins/bpms.html",
+      nextName: "経理精算・完了アーカイブ (仮)",
+      nextTarget: "draft:settlement_archive.html"
+    };
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function setStatus(msg, isErr = false) {
+      const el = document.getElementById("status-toast");
+      if (el) {
+        el.innerText = msg;
+        el.className = `text-[10px] truncate max-w-md ${isErr ? "text-rose-400 font-bold" : "text-emerald-300"}`;
+      }
+    }
+
+    function appendLog(objOrText) {
+      const pre = document.getElementById("api-exec-log");
+      if (!pre) return;
+      const line = typeof objOrText === "string" ? objOrText : JSON.stringify(objOrText, null, 2);
+      pre.textContent = `[${new Date().toLocaleTimeString()}]\n${line}\n\n` + pre.textContent;
+    }
+
+    function toggleChatPanel() {
+      document.getElementById("built-in-chat-panel")?.classList.toggle("hidden");
+    }
+
+    function toggleChatKeyInput() {
+      document.getElementById("chat-key-bar")?.classList.toggle("hidden");
+    }
+
+    function toggleFlowConfigDrawer() {
+      document.getElementById("flow-config-drawer")?.classList.toggle("hidden");
+    }
+
+    function loadWorkflowRelayConfig() {
+      try {
+        const saved = localStorage.getItem("bpms_workflow_relay_cfg");
+        if (saved) workflowRelay = { ...workflowRelay, ...JSON.parse(saved) };
+      } catch (e) {}
+      document.getElementById("inp-prev-name").value = workflowRelay.prevName;
+      document.getElementById("inp-prev-target").value = workflowRelay.prevTarget;
+      document.getElementById("inp-curr-name").value = workflowRelay.currName;
+      document.getElementById("inp-curr-target").value = workflowRelay.currTarget;
+      document.getElementById("inp-next-name").value = workflowRelay.nextName;
+      document.getElementById("inp-next-target").value = workflowRelay.nextTarget;
+      applyWorkflowRelayToUi();
+    }
+
+    function saveWorkflowRelayConfig() {
+      workflowRelay = {
+        prevName: document.getElementById("inp-prev-name").value.trim() || "前の業務 (仮)",
+        prevTarget: document.getElementById("inp-prev-target").value.trim() || "draft:prev.html",
+        currName: document.getElementById("inp-curr-name").value.trim() || "今の業務",
+        currTarget: document.getElementById("inp-curr-target").value.trim() || "plugins/bpms.html",
+        nextName: document.getElementById("inp-next-name").value.trim() || "次の業務 (仮)",
+        nextTarget: document.getElementById("inp-next-target").value.trim() || "draft:next.html"
+      };
+      localStorage.setItem("bpms_workflow_relay_cfg", JSON.stringify(workflowRelay));
+      applyWorkflowRelayToUi();
+      document.getElementById("flow-config-drawer")?.classList.add("hidden");
+      setStatus("✅ 前後業務リレーリンクを更新しました！");
+    }
+
+    let bpmnViewerInstance = null;
+    let currentBpmnXml = "";
+
+    function buildDefaultBpmnXml() {
+      const pName = escapeHtml(workflowRelay.prevName);
+      const cName = escapeHtml(workflowRelay.currName);
+      const nName = escapeHtml(workflowRelay.nextName);
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  id="Definitions_BPMS" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_BPMS_Master" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="開始">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Task_Prev" name="${pName}">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Task_Curr" name="● ${cName}">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_Check" name="承認判定">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Next" name="${nName}">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="EndEvent_1" name="完了アーカイブ">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_Prev" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Prev" targetRef="Task_Curr" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Curr" targetRef="Gateway_Check" />
+    <bpmn:sequenceFlow id="Flow_4" name="OK" sourceRef="Gateway_Check" targetRef="Task_Next" />
+    <bpmn:sequenceFlow id="Flow_Reject" name="差戻" sourceRef="Gateway_Check" targetRef="Task_Prev" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_Next" targetRef="EndEvent_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_BPMS_Master">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1"><dc:Bounds x="130" y="102" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Prev_di" bpmnElement="Task_Prev"><dc:Bounds x="220" y="80" width="150" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Curr_di" bpmnElement="Task_Curr"><dc:Bounds x="430" y="80" width="170" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Check_di" bpmnElement="Gateway_Check" isMarkerVisible="true"><dc:Bounds x="655" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Next_di" bpmnElement="Task_Next"><dc:Bounds x="765" y="80" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1"><dc:Bounds x="985" y="102" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="166" y="120" /><di:waypoint x="220" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="370" y="120" /><di:waypoint x="430" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="600" y="120" /><di:waypoint x="655" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="705" y="120" /><di:waypoint x="765" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Reject_di" bpmnElement="Flow_Reject"><di:waypoint x="680" y="95" /><di:waypoint x="680" y="42" /><di:waypoint x="295" y="42" /><di:waypoint x="295" y="80" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5"><di:waypoint x="925" y="120" /><di:waypoint x="985" y="120" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`;
+    }
+
+    async function renderBpmnDiagram(xmlStr = null) {
+      const container = document.getElementById("bpmn-canvas-wrap");
+      if (!container || typeof BpmnJS === "undefined") return;
+      if (!bpmnViewerInstance) {
+        bpmnViewerInstance = new BpmnJS({ container });
+        const eventBus = bpmnViewerInstance.get("eventBus");
+        eventBus.on("element.click", (e) => {
+          const bo = e.element?.businessObject;
+          if (!bo || !bo.$type || !bo.$type.includes("Task")) return;
+          const taskTitle = bo.name || bo.id;
+          if (bo.id === "Task_Prev") {
+            navigateWorkflowStep("prev");
+          } else if (bo.id === "Task_Next") {
+            navigateWorkflowStep("next");
+          } else {
+            sendQuickChat(`BPMN全体図のタスク「${taskTitle}」について、必要なGAS関数・入力データ・次工程への引き継ぎ条件を整理して！`);
+          }
+        });
+      }
+      currentBpmnXml = xmlStr || localStorage.getItem("bpms_custom_bpmn_xml") || buildDefaultBpmnXml();
+      try {
+        await bpmnViewerInstance.importXML(currentBpmnXml);
+        const canvas = bpmnViewerInstance.get("canvas");
+        canvas.zoom("fit-viewport");
+        try { canvas.addMarker("Task_Curr", "bpmn-active-task"); } catch (e) {}
+      } catch (err) {
+        setStatus(`⚠️ BPMN読込エラー: ${err.message}`, true);
+      }
+    }
+
+    function fitBpmnViewport() {
+      if (bpmnViewerInstance) {
+        bpmnViewerInstance.get("canvas").zoom("fit-viewport");
+      }
+    }
+
+    function toggleBpmnPanelHeight() {
+      const wrap = document.getElementById("bpmn-canvas-wrap");
+      if (!wrap) return;
+      wrap.classList.toggle("h-[230px]");
+      wrap.classList.toggle("h-[460px]");
+      setTimeout(fitBpmnViewport, 250);
+    }
+
+    async function handleBpmnFileUpload(ev) {
+      const file = ev.target?.files?.[0];
+      if (!file) return;
+      const xml = await file.text();
+      localStorage.setItem("bpms_custom_bpmn_xml", xml);
+      await renderBpmnDiagram(xml);
+      setStatus(`🗺️ BPMN全体図 [${file.name}] を読み込みました！`);
+    }
+
+    async function downloadBpmnXmlFile() {
+      const xml = currentBpmnXml || buildDefaultBpmnXml();
+      const blob = new Blob([xml], { type: "application/xml;charset=utf-8" });
+      await triggerReliableBrowserDownload(blob, `workflow_master_${new Date().toISOString().slice(0, 10)}.bpmn`);
+      setStatus("⬇️ BPMN 2.0 ファイル (.bpmn) のダウンロード準備完了！");
+    }
+
+    function applyWorkflowRelayToUi() {
+      document.getElementById("lbl-prev-step").innerText = workflowRelay.prevName;
+      document.getElementById("lbl-curr-step").innerText = workflowRelay.currName;
+      document.getElementById("lbl-next-step").innerText = workflowRelay.nextName;
+
+      const mermaidDef = `flowchart LR
+    PREV["◀ 前の業務<br/>${workflowRelay.prevName.replace(/"/g, "'")}"] --> CURR["● 今の業務<br/>${workflowRelay.currName.replace(/"/g, "'")}"]
+    CURR --> NEXT["▶ 次の業務<br/>${workflowRelay.nextName.replace(/"/g, "'")}"]
+    CURR -.-> CHILD["🌐 リモートGAS / ⚡ n8n"]`;
+      renderMermaidBotFlow(mermaidDef);
+      if (!localStorage.getItem("bpms_custom_bpmn_xml")) {
+        renderBpmnDiagram(buildDefaultBpmnXml());
+      }
+    }
+
+    function navigateWorkflowStep(direction) {
+      const isPrev = direction === "prev";
+      const stepLabel = isPrev ? "◀ 前の業務" : "▶ 次の業務";
+      const stepName = isPrev ? workflowRelay.prevName : workflowRelay.nextName;
+      const target = isPrev ? workflowRelay.prevTarget : workflowRelay.nextTarget;
+      const host = getAccessibleParentHost();
+
+      if (/^https?:\/\//i.test(target)) {
+        window.open(target, "_blank", "noopener");
+        setStatus(`🔗 ${stepLabel} [${stepName}] を開きました`);
+        return;
+      }
+
+      if (host && !target.startsWith("draft:")) {
+        const cleanTarget = target.replace(/\.html$/i, "");
+        try {
+          const files = Array.isArray(host.projectFiles) ? host.projectFiles : host.eval("typeof projectFiles !== 'undefined' ? projectFiles : []");
+          const found = files.find(f => f.name === cleanTarget || f.name.endsWith("/" + cleanTarget));
+          if (found && typeof host.openFileTab === "function") {
+            host.openFileTab(found.name);
+            setStatus(`🔄 親IDEで ${stepLabel} [${found.name}.html] に切り替えました！`);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      const cleanFileName = target.replace(/^draft:/i, "").replace(/\.html$/i, "") || (isPrev ? "prev_step" : "next_step");
+      appendChatMsg("model",
+        `<div class="space-y-1.5">` +
+        `<div class="font-bold text-amber-300">🔗 ${escapeHtml(stepLabel)}（仮リンク）をクリックしました！</div>` +
+        `<div>• 業務名: <b>${escapeHtml(stepName)}</b></div>` +
+        `<div>• 仮リンク先: <code>${escapeHtml(target)}</code></div>` +
+        `<div class="text-[11px] text-slate-300">まだ本番画面が未接続の「仮リンク」状態です。下のボタンで今すぐこの業務単位のHTML画面を生成できます👇</div>` +
+        `<button type="button" onclick="sendQuickChat('「${escapeHtml(stepName)}」用の新しい作業単位HTML画面（ファイル名: ${escapeHtml(cleanFileName)}）を、今の画面と前後リンクで繋がるように生成して親IDEに追加して！')" ` +
+        `class="mt-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2.5 py-1 rounded text-[11px] cursor-pointer">` +
+        `✨ 「${escapeHtml(stepName)}」の画面を今すぐ作る` +
+        `</button>` +
+        `</div>`
+      );
+      setStatus(`🔗 仮リンク [${stepName}] をチャットへリレーしました！`);
+    }
+
+    function getAccessibleParentHost() {
+      for (const win of [window.opener, window.parent]) {
+        if (!win || win === window) continue;
+        try {
+          if (!win.closed && win.document && win.location.href !== undefined) return win;
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    function resolveGeminiApiKey() {
+      const host = getAccessibleParentHost();
+      const k = document.getElementById("inp-chat-api-key")?.value.trim()
+        || host?.localStorage?.getItem("cfg_gemini_api_key")
+        || host?.document?.getElementById("cfg-modal-gemini-key")?.value
+        || localStorage.getItem("cfg_gemini_api_key")
+        || scriptPropsCache.GEMINI_API_KEY
+        || "";
+      if (k) {
+        localStorage.setItem("cfg_gemini_api_key", k);
+        const inp = document.getElementById("inp-chat-api-key");
+        if (inp && !inp.value) inp.value = k;
+      }
+      return k;
+    }
+
+    async function discoverChatModels(apiKey) {
+      if (!apiKey) return;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const valid = (data.models || [])
+          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+          .map(m => m.name.replace(/^models\//, ""))
+          .filter(n => n.includes("gemini"));
+        if (valid.length > 0) {
+          const priority = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.0-flash"];
+          availableChatModels = [...priority.filter(p => valid.includes(p)), ...valid.filter(v => !priority.includes(v))];
+          const sel = document.getElementById("chat-model-select");
+          if (sel) {
+            const prev = sel.value;
+            sel.innerHTML = availableChatModels.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+            sel.value = availableChatModels.includes(prev) ? prev : availableChatModels[0];
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function getOAuthToken() {
+      const host = getAccessibleParentHost();
+      if (!host) return localStorage.getItem("google_oauth_access_token") || "";
+      try {
+        if (typeof host.checkOrRefreshToken === "function") {
+          const t = await host.checkOrRefreshToken();
+          if (t) return t;
+        }
+        return host.eval("typeof currentAccessToken !== 'undefined' ? currentAccessToken : ''")
+          || host.localStorage?.getItem("google_oauth_access_token") || "";
+      } catch (e) {
+        return host.localStorage?.getItem("google_oauth_access_token") || "";
+      }
+    }
+
+    function getHostScriptId() {
+      const host = getAccessibleParentHost();
+      if (!host) return localStorage.getItem("cfg_project_edit_id") || "";
+      try {
+        return host.eval("typeof currentActiveProjectId !== 'undefined' ? currentActiveProjectId : ''")
+          || host.document?.getElementById("quick-target-script-id")?.value
+          || host.localStorage?.getItem("cfg_project_edit_id") || "";
+      } catch (e) {
+        return host.localStorage?.getItem("cfg_project_edit_id") || "";
+      }
+    }
+
+    function resolveWebAppUrl() {
+      const host = getAccessibleParentHost();
+      return document.getElementById("inp-webapp-exec-url")?.value.trim()
+        || scriptPropsCache.GAS_WEBAPP_URL
+        || scriptPropsCache.WEBAPP_URL
+        || host?.localStorage?.getItem("cfg_webapp_url")
+        || localStorage.getItem("cfg_bpms_webapp_url")
+        || "";
+    }
+
+    async function invokeGasFunctionSmart(targetScriptId, fnName, params = []) {
+      const host = getAccessibleParentHost();
+      const hostId = getHostScriptId();
+      const token = await getOAuthToken();
+      const webAppUrl = resolveWebAppUrl();
+
+      if (host && targetScriptId === hostId && typeof host.triggerRunFunction === "function") {
+        try {
+          const picker = host.document?.getElementById("top-function-picker");
+          if (picker && [...picker.options].some(o => o.value === fnName) && (!params || params.length === 0)) {
+            picker.value = fnName;
+            await host.triggerRunFunction();
+            return { via: "ParentHostIDE", status: "TRIGGERED_IN_HOST", function: fnName };
+          }
+        } catch (e) {}
+      }
+
+      if (token && targetScriptId) {
+        try {
+          const res = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(targetScriptId)}:run`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ function: fnName, parameters: params, devMode: true })
+          });
+          const data = await res.json();
+          if (!data.error) {
+            return { via: "ExecutionAPI(scripts.run)", result: data.response?.result };
+          }
+          const errMsg = data.error.details?.[0]?.errorMessage || data.error.message || "";
+          if (!errMsg.includes("NOT_FOUND") && !errMsg.includes("not found")) {
+            throw new Error(errMsg);
+          }
+        } catch (apiErr) {
+          if (!webAppUrl) {
+            throw new Error(`${apiErr.message} (※API実行デプロイ未設定のため上の「🔗 WebApp URL」を入力してください)`);
+          }
+        }
+      }
+
+      if (webAppUrl) {
+        const res = await fetch(webAppUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: fnName,
+            function: fnName,
+            parameters: params,
+            scriptId: targetScriptId,
+            google_access_token: token
+          })
+        });
+        const text = await res.text();
+        let parsed;
+        try { parsed = JSON.parse(text); } catch (e) { parsed = text; }
+        return { via: "WebApp(doPost)", status: res.status, result: parsed };
+      }
+
+      throw new Error("実行経路が見つかりません（API実行デプロイ未設定。上の「🔗 WebApp URL」を設定してください）");
+    }
+
+    async function bootstrapAllKnowledge() {
+      const host = getAccessibleParentHost();
+      const badge = document.getElementById("host-status-badge");
+      const hostId = getHostScriptId();
+
+      if (host) {
+        badge.innerText = "🟢 親IDE直結";
+        badge.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-950 border border-emerald-600 text-emerald-300 font-bold";
+      } else {
+        badge.innerText = "🟡 スタンドアロン";
+        badge.className = "text-[10px] px-2 py-0.5 rounded bg-amber-950 border border-amber-700 text-amber-300";
+      }
+
+      const targetInp = document.getElementById("inp-target-script-id");
+      if (targetInp && !targetInp.value) {
+        const quickTarget = host?.document?.getElementById("quick-target-script-id")?.value || hostId;
+        if (quickTarget) targetInp.value = quickTarget;
+      }
+
+      try {
+        const hostCached = host?.localStorage?.getItem("cached_gas_skill_props") || localStorage.getItem("cached_gas_skill_props");
+        if (hostCached) scriptPropsCache = JSON.parse(hostCached);
+
+        const token = await getOAuthToken();
+        if (hostId && token) {
+          setStatus("🔑 1️⃣ ScriptProperties から台帳同期中...");
+          for (const fnName of ["getAllScriptProperties", "getScriptProperties", "apiGetScriptProperties"]) {
+            const res = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(hostId)}:run`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ function: fnName, parameters: [], devMode: true })
+            });
+            const data = await res.json();
+            if (!data.error && data.response?.result) {
+              scriptPropsCache = { ...scriptPropsCache, ...data.response.result };
+              localStorage.setItem("cached_gas_skill_props", JSON.stringify(scriptPropsCache));
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+
+      renderPropsAndCatalog();
+
+      const apiKey = resolveGeminiApiKey();
+      if (apiKey) discoverChatModels(apiKey);
+
+      const savedWebApp = resolveWebAppUrl();
+      const webInp = document.getElementById("inp-webapp-exec-url");
+      if (webInp && !webInp.value && savedWebApp) webInp.value = savedWebApp;
+
+      if (scriptPropsCache.SUPABASE_URL || localStorage.getItem("cfg_supabase_url")) {
+        document.getElementById("stat-supa").innerText = "接続準備OK";
+      }
+      setStatus("✅ 1️⃣ Props台帳ロード完了！");
+    }
+
+    function renderPropsAndCatalog() {
+      const keys = Object.keys(scriptPropsCache);
+      document.getElementById("stat-props").innerText = `${keys.length} keys`;
+
+      remoteChildrenMap = {};
+      if (scriptPropsCache.REMOTE_GAS_CHILDREN) {
+        try { remoteChildrenMap = JSON.parse(scriptPropsCache.REMOTE_GAS_CHILDREN); } catch (e) {}
+      }
+      keys.filter(k => k.startsWith("CHILD_GAS_")).forEach(k => {
+        remoteChildrenMap[k.replace(/^CHILD_GAS_/, "")] = scriptPropsCache[k];
+      });
+
+      const selRemote = document.getElementById("sel-remote-gas");
+      const currentTarget = document.getElementById("inp-target-script-id")?.value || "";
+      const entries = Object.entries(remoteChildrenMap);
+      selRemote.innerHTML = `<option value="">-- 登録済み子GAS (${entries.length}件) --</option>` +
+        entries.map(([alias, sid]) => `<option value="${escapeHtml(sid)}">${escapeHtml(alias)} (${String(sid).slice(0, 10)}...)</option>`).join("");
+      if (currentTarget && entries.some(([, sid]) => sid === currentTarget)) selRemote.value = currentTarget;
+
+      if (scriptPropsCache.DUCKDB_SHARDS_REGISTRY) {
+        try {
+          const reg = JSON.parse(scriptPropsCache.DUCKDB_SHARDS_REGISTRY);
+          const shardSel = document.getElementById("sel-duckdb-shard");
+          Object.entries(reg).forEach(([k, v]) => {
+            const dbName = v.db_name || `opfs://${k}.db`;
+            if (![...shardSel.options].some(o => o.value === dbName)) {
+              const opt = document.createElement("option");
+              opt.value = dbName;
+              opt.textContent = `${dbName} (${v.desc || k})`;
+              shardSel.appendChild(opt);
+            }
+          });
+        } catch (e) {}
+      }
+
+      const catEl = document.getElementById("knowledge-catalog-list");
+      const knowledgeKeys = keys.filter(k =>
+        k.startsWith("SKILL_PROMPT_") || k.startsWith("PROMPT_") || k.startsWith("DUCKDB_") || k.startsWith("REMOTE_GAS_") || k.startsWith("CHILD_GAS_")
+      );
+
+      if (knowledgeKeys.length === 0) {
+        catEl.innerHTML = `<div class="p-2.5 rounded bg-black/50 border border-slate-800 text-slate-400 col-span-2">まだ専用ナレッジキーがありません。「➕ このGAS IDを台帳に登録」から子GASを追加できます。</div>`;
+        return;
+      }
+
+      catEl.innerHTML = knowledgeKeys.map(k => {
+        const val = String(scriptPropsCache[k]);
+        return `
+          <div class="p-2.5 rounded-lg bg-black/70 border border-purple-900/80 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-300 truncate">🔑 ${escapeHtml(k)}</span>
+              <span class="text-[9px] text-slate-500">${val.length} chars</span>
+            </div>
+            <div class="text-[10px] text-slate-300 line-clamp-2 break-all">${escapeHtml(val.slice(0, 140))}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function onRemoteGasPresetSelect() {
+      const sid = document.getElementById("sel-remote-gas").value;
+      if (sid) {
+        document.getElementById("inp-target-script-id").value = sid;
+        scanRemoteGasFunctions();
+      }
+    }
+
+    async function registerCurrentRemoteGasToProps() {
+      const sid = document.getElementById("inp-target-script-id").value.trim();
+      const alias = document.getElementById("inp-child-alias").value.trim() || `ChildGAS_${sid.slice(0, 6)}`;
+      if (!sid) {
+        setStatus("⚠️ 登録する GAS Script ID を入力してください", true);
+        return;
+      }
+
+      remoteChildrenMap[alias] = sid;
+      const payloadProps = { REMOTE_GAS_CHILDREN: JSON.stringify(remoteChildrenMap) };
+      scriptPropsCache.REMOTE_GAS_CHILDREN = payloadProps.REMOTE_GAS_CHILDREN;
+      localStorage.setItem("cached_gas_skill_props", JSON.stringify(scriptPropsCache));
+      const host = getAccessibleParentHost();
+      if (host?.localStorage) host.localStorage.setItem("cached_gas_skill_props", JSON.stringify(scriptPropsCache));
+      renderPropsAndCatalog();
+
+      const hostId = getHostScriptId();
+      try {
+        const res = await invokeGasFunctionSmart(hostId, "apiSaveScriptProperties", [payloadProps]);
+        setStatus(`✅ 子GAS [${alias}] をクラウド ScriptProperties へ保存しました！`);
+        appendLog({ savedChildGas: { alias, sid }, response: res });
+      } catch (err) {
+        setStatus(`✅ 子GAS [${alias}] をローカル台帳に登録完了！`);
+        appendLog({ savedLocalRegistry: { alias, sid }, note: err.message });
+      }
+    }
+
+    function extractFunctionsFromFiles(files, targetScriptId) {
+      const results = [];
+      for (const f of files) {
+        if (f.type !== "SERVER_JS" && !String(f.name).endsWith(".gs")) continue;
+        const src = String(f.source || "");
+        const regex = /(?:\/\*\*([\s\S]*?)\*\/\s*)?function\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)/g;
+        let m;
+        while ((m = regex.exec(src)) !== null) {
+          const docRaw = (m[1] || "").replace(/^\s*\*\s?/gm, "").trim();
+          const fnName = m[2];
+          const paramsStr = m[3].trim();
+          if (fnName.endsWith("_")) continue;
+          results.push({
+            scriptId: targetScriptId,
+            fileName: f.name,
+            fnName,
+            paramsStr,
+            doc: docRaw.split("\n")[0] || `${f.name}.gs の公開関数`
+          });
+        }
+      }
+      loadedRemoteFunctions = results;
+      return results;
+    }
+
+    function renderDynamicFunctionCards(fnList, targetScriptId) {
+      const listEl = document.getElementById("dynamic-functions-list");
+      if (!fnList || fnList.length === 0) {
+        listEl.innerHTML = `<div class="p-3 rounded bg-black/60 border border-rose-800/60 text-xs text-rose-300">公開関数が見つかりませんでした。</div>`;
+        return;
+      }
+
+      listEl.innerHTML = fnList.map(item => `
+        <div class="p-2.5 rounded-lg bg-black/80 border border-slate-800 hover:border-emerald-700/80 flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Entry</span>
+              <span class="font-bold text-xs text-cyan-300">${escapeHtml(item.fnName)}</span>
+              <span class="text-[11px] text-slate-400">(${escapeHtml(item.paramsStr)})</span>
+              <span class="text-[10px] text-slate-500">[${escapeHtml(item.fileName)}.gs]</span>
+            </div>
+            <div class="text-[10px] text-slate-400 truncate mt-0.5">${escapeHtml(item.doc)}</div>
+          </div>
+          <button type="button" onclick="executeRemoteGasFunction('${escapeHtml(targetScriptId)}', '${escapeHtml(item.fnName)}')"
+                  class="shrink-0 bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-2.5 py-1 rounded text-[11px] cursor-pointer shadow">
+            ▶ 実行
+          </button>
+        </div>
+      `).join("");
+    }
+
+    async function scanRemoteGasFunctions() {
+      const targetId = document.getElementById("inp-target-script-id").value.trim();
+      if (!targetId) {
+        setStatus("⚠️ 対象の GAS Script ID を入力してください", true);
+        return;
+      }
+      const token = await getOAuthToken();
+      if (!token) {
+        setStatus("⚠️ OAuth2 トークンが未取得です", true);
+        return;
+      }
+
+      setStatus(`🔍 リモートGAS (${targetId.slice(0, 12)}...) の関数を動的スキャン中...`);
+      try {
+        const res = await fetch(`https://script.googleapis.com/v1/projects/${encodeURIComponent(targetId)}/content`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
+
+        const files = data.files || [];
+        const fnList = extractFunctionsFromFiles(files, targetId);
+        renderDynamicFunctionCards(fnList, targetId);
+        setStatus(`✅ リモートGASから ${fnList.length} 個の関数を動的ロードしました！`);
+      } catch (err) {
+        setStatus(`❌ 関数ロード失敗: ${err.message}`, true);
+        appendLog({ error: err.message, scriptId: targetId });
+      }
+    }
+
+    function loadParentHostFunctions() {
+      const host = getAccessibleParentHost();
+      const hostId = getHostScriptId();
+      if (!host) {
+        setStatus("⚠️ 親IDEが検出されませんでした", true);
+        return;
+      }
+      let files = [];
+      try {
+        files = Array.isArray(host.projectFiles) ? host.projectFiles : host.eval("typeof projectFiles !== 'undefined' ? projectFiles : []");
+      } catch (e) {}
+      document.getElementById("inp-target-script-id").value = hostId;
+      const fnList = extractFunctionsFromFiles(files, hostId);
+      renderDynamicFunctionCards(fnList, hostId);
+      setStatus(`🏠 親母艦 (${hostId.slice(0, 12)}...) の関数 ${fnList.length} 件を表示しました`);
+    }
+
+    async function executeRemoteGasFunction(targetScriptId, fnName) {
+      let params = [];
+      const rawParams = document.getElementById("inp-fn-params")?.value.trim();
+      if (rawParams) {
+        try {
+          const parsed = JSON.parse(rawParams);
+          params = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (e) {
+          setStatus("⚠️ 引数JSONの形式が不正です", true);
+          return;
+        }
+      }
+
+      setStatus(`⚡ GAS [${fnName}] を実行中...`);
+      try {
+        const outcome = await invokeGasFunctionSmart(targetScriptId, fnName, params);
+        setStatus(`✅ [${fnName}] 実行成功！ (${outcome.via})`);
+        appendLog({ scriptId: targetScriptId, function: fnName, params, ...outcome });
+        return outcome;
+      } catch (err) {
+        setStatus(`❌ [${fnName}] 実行エラー: ${err.message}`, true);
+        appendLog({ scriptId: targetScriptId, function: fnName, error: err.message });
+        throw err;
+      }
+    }
+
+    async function fetchSupabaseKnowledge() {
+      const supaUrl = scriptPropsCache.SUPABASE_URL || localStorage.getItem("cfg_supabase_url") || "";
+      const supaKey = scriptPropsCache.SUPABASE_ANON_KEY || scriptPropsCache.SUPABASE_KEY || localStorage.getItem("cfg_supabase_key") || "";
+      if (!supaUrl || !supaKey) {
+        setStatus("⚠️ ScriptProperties に SUPABASE_URL / SUPABASE_ANON_KEY が未設定です", true);
+        return;
+      }
+      setStatus("🗄️ Supabase ナレッジ倉庫へ問い合わせ中...");
+      try {
+        const res = await fetch(`${supaUrl.replace(/\/$/, "")}/rest/v1/knowledge_base?select=*&limit=20`, {
+          headers: { "apikey": supaKey, "Authorization": `Bearer ${supaKey}` }
+        });
+        const rows = await res.json();
+        document.getElementById("stat-supa").innerText = `${Array.isArray(rows) ? rows.length : 0} rows`;
+        appendLog({ source: "Supabase knowledge_base", rows });
+        setStatus(`✅ Supabase 倉庫から ${Array.isArray(rows) ? rows.length : 0} 件を取得しました`);
+      } catch (err) {
+        setStatus(`⚠️ Supabase 取得: ${err.message}`, true);
+      }
+    }
+
+    async function triggerN8nWithToken() {
+      const token = await getOAuthToken();
+      const targetId = document.getElementById("inp-target-script-id").value.trim() || getHostScriptId();
+      const webhookUrl = scriptPropsCache.N8N_WEBHOOK_URL || scriptPropsCache.N8N_EXEC_URL || "";
+
+      if (webhookUrl) {
+        setStatus("⚡ Token付きで n8n Webhook を直接発火中...");
+        const res = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            script_id: targetId,
+            google_access_token: token,
+            action: "bpms_orchestrate",
+            timestamp: new Date().toISOString()
+          })
+        });
+        const text = await res.text();
+        appendLog({ n8nWebhookStatus: res.status, response: text });
+        setStatus(`✅ n8n Webhook 実行完了 (HTTP ${res.status})`);
+      } else if (targetId) {
+        await executeRemoteGasFunction(targetId, "n8nexec");
+      } else {
+        setStatus("⚠️ N8N_WEBHOOK_URL または GAS ID が未設定です", true);
+      }
+    }
+
+    async function ensureSqlJs() {
+      if (sqlJsPromise) return sqlJsPromise;
+      sqlJsPromise = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js";
+        s.onload = async () => resolve(await window.initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}` }));
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      return sqlJsPromise;
+    }
+
+    function uint8ToBase64(bytes) {
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    }
+
+    async function triggerReliableBrowserDownload(blob, filename) {
+      const arrayBuf = await blob.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuf);
+      const base64Str = uint8ToBase64(uint8);
+      const dataUrl = `data:application/octet-stream;base64,${base64Str}`;
+
+      const host = getAccessibleParentHost();
+      if (host && host.document && host.Blob && host.URL) {
+        try {
+          const hostBlob = new host.Blob([uint8], { type: "application/octet-stream" });
+          const hostUrl = host.URL.createObjectURL(hostBlob);
+          const pa = host.document.createElement("a");
+          pa.href = hostUrl;
+          pa.download = filename;
+          pa.style.display = "none";
+          host.document.body.appendChild(pa);
+          pa.click();
+          pa.remove();
+          setTimeout(() => host.URL.revokeObjectURL(hostUrl), 20000);
+        } catch (e) {}
+      }
+
+      let bar = document.getElementById("direct-dl-fallback-bar");
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "direct-dl-fallback-bar";
+        bar.className = "bg-emerald-950 border-b-2 border-emerald-400 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sticky top-11 z-30 shadow-xl";
+        document.body.insertBefore(bar, document.querySelector("div.flex-1"));
+      }
+      bar.innerHTML = `
+        <span class="text-emerald-200 font-bold">📦 DB準備完了: ${escapeHtml(filename)} (${(uint8.byteLength / 1024).toFixed(1)} KB)</span>
+        <div class="flex items-center gap-2">
+          <a href="${dataUrl}" download="${escapeHtml(filename)}"
+             class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-3 py-1 rounded shadow cursor-pointer">
+            ⬇️ ここをクリックして保存 (${escapeHtml(filename)})
+          </a>
+          <button type="button" id="btn-copy-db-b64"
+                  class="bg-slate-800 hover:bg-slate-700 text-cyan-200 border border-cyan-600 px-2.5 py-1 rounded cursor-pointer">
+            📋 Base64コピー
+          </button>
+          <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-slate-300 hover:text-white px-1">✕</button>
+        </div>
+      `;
+      document.getElementById("btn-copy-db-b64").onclick = async () => {
+        await navigator.clipboard.writeText(base64Str);
+        setStatus(`📋 ${filename} の Base64 (${base64Str.length}文字) をコピーしました！`);
+      };
+
+      try {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {}
+    }
+
+    async function downloadDatabaseFile(ext = "sqlite") {
+      const shard = document.getElementById("sel-duckdb-shard").value;
+      const baseName = shard.replace(/^opfs:\/\//, "").replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_db$/, "");
+      const dateTag = new Date().toISOString().slice(0, 10);
+      const host = getAccessibleParentHost();
+
+      let hostFiles = [];
+      try {
+        hostFiles = Array.isArray(host?.projectFiles) ? host.projectFiles : host?.eval("typeof projectFiles !== 'undefined' ? projectFiles : []") || [];
+      } catch (e) {}
+
+      try {
+        setStatus(`📦 [${shard}] を .${ext} 形式で生成中...`);
+        if (ext === "sql") {
+          const lines = [
+            `-- Exported from BPMS Remote-GAS Orchestrator (${shard}) at ${new Date().toISOString()}`,
+            `CREATE TABLE IF NOT EXISTS remote_gas_registry (alias TEXT PRIMARY KEY, script_id TEXT);`,
+            ...Object.entries(remoteChildrenMap).map(([a, id]) =>
+              `INSERT OR REPLACE INTO remote_gas_registry VALUES ('${String(a).replace(/'/g, "''")}', '${String(id).replace(/'/g, "''")}');`
+            ),
+            `CREATE TABLE IF NOT EXISTS script_properties (prop_key TEXT PRIMARY KEY, prop_value TEXT);`,
+            ...Object.entries(scriptPropsCache).map(([k, v]) =>
+              `INSERT OR REPLACE INTO script_properties VALUES ('${String(k).replace(/'/g, "''")}', '${String(v).replace(/'/g, "''")}');`
+            ),
+            `CREATE TABLE IF NOT EXISTS gas_files (name TEXT PRIMARY KEY, file_type TEXT, source TEXT);`,
+            ...hostFiles.map(f =>
+              `INSERT OR REPLACE INTO gas_files VALUES ('${String(f.name).replace(/'/g, "''")}', '${String(f.type).replace(/'/g, "''")}', '${String(f.source || "").replace(/'/g, "''")}');`
+            ),
+            `CREATE TABLE IF NOT EXISTS chat_history (seq INTEGER PRIMARY KEY, role TEXT, content TEXT, model TEXT, created_at TEXT);`,
+            ...builtInChatLogRows.map(r =>
+              `INSERT OR REPLACE INTO chat_history VALUES (${Number(r.seq)}, '${String(r.role).replace(/'/g, "''")}', '${String(r.text).replace(/'/g, "''")}', '${String(r.model || "").replace(/'/g, "''")}', '${String(r.ts).replace(/'/g, "''")}');`
+            )
+          ];
+          const blob = new Blob([lines.join("\n")], { type: "application/sql;charset=utf-8" });
+          const fname = `${baseName}_${dateTag}.sql`;
+          await triggerReliableBrowserDownload(blob, fname);
+          setStatus(`✅ SQLダンプ [${fname}] の準備完了！`);
+          return;
+        }
+
+        const SQL = await ensureSqlJs();
+        const db = new SQL.Database();
+
+        db.run("CREATE TABLE shard_info (shard_name TEXT PRIMARY KEY, exported_at TEXT);");
+        const st0 = db.prepare("INSERT INTO shard_info VALUES (?, ?);");
+        st0.run([shard, new Date().toISOString()]);
+        st0.free();
+
+        db.run("CREATE TABLE remote_gas_registry (alias TEXT PRIMARY KEY, script_id TEXT);");
+        const st1 = db.prepare("INSERT INTO remote_gas_registry VALUES (?, ?);");
+        Object.entries(remoteChildrenMap).forEach(([a, id]) => st1.run([a, String(id)]));
+        st1.free();
+
+        db.run("CREATE TABLE script_properties (prop_key TEXT PRIMARY KEY, prop_value TEXT);");
+        const st2 = db.prepare("INSERT INTO script_properties VALUES (?, ?);");
+        Object.entries(scriptPropsCache).forEach(([k, v]) => st2.run([k, String(v)]));
+        st2.free();
+
+        db.run("CREATE TABLE gas_files (name TEXT PRIMARY KEY, file_type TEXT, source TEXT);");
+        const st3 = db.prepare("INSERT INTO gas_files VALUES (?, ?, ?);");
+        hostFiles.forEach(f => st3.run([String(f.name || ""), String(f.type || "SERVER_JS"), String(f.source || "")]));
+        st3.free();
+
+        db.run("CREATE TABLE chat_history (seq INTEGER PRIMARY KEY, role TEXT, content TEXT, model TEXT, created_at TEXT);");
+        const st4 = db.prepare("INSERT INTO chat_history VALUES (?, ?, ?, ?, ?);");
+        builtInChatLogRows.forEach(r => st4.run([Number(r.seq), String(r.role), String(r.text), String(r.model || ""), String(r.ts || "")]));
+        st4.free();
+
+        db.run("CREATE TABLE bpmn_diagrams (diagram_id TEXT PRIMARY KEY, bpmn_xml TEXT, updated_at TEXT);");
+        const st5 = db.prepare("INSERT INTO bpmn_diagrams VALUES (?, ?, ?);");
+        st5.run(["master_flow", currentBpmnXml || buildDefaultBpmnXml(), new Date().toISOString()]);
+        st5.free();
+
+        const bin = db.export();
+        db.close();
+
+        const blob = new Blob([bin], { type: "application/x-sqlite3" });
+        const fname = `${baseName}_${dateTag}.${ext}`;
+        await triggerReliableBrowserDownload(blob, fname);
+        setStatus(`✅ DBファイル [${fname}] (${(bin.byteLength / 1024).toFixed(1)} KB) の準備完了！`);
+        appendLog({ downloadedDb: fname, bytes: bin.byteLength, filesCount: hostFiles.length, propsCount: Object.keys(scriptPropsCache).length });
+      } catch (err) {
+        setStatus(`❌ DBダウンロードエラー: ${err.message}`, true);
+      }
+    }
+
+    async function importSqliteToShard(ev) {
+      const file = ev.target?.files?.[0];
+      if (!file) return;
+      try {
+        const SQL = await ensureSqlJs();
+        let db;
+        if (file.name.toLowerCase().endsWith(".sql")) {
+          db = new SQL.Database();
+          db.run(await file.text());
+        } else {
+          const buf = await file.arrayBuffer();
+          db = new SQL.Database(new Uint8Array(buf));
+        }
+
+        const propsRes = db.exec("SELECT prop_key, prop_value FROM script_properties;");
+        if (propsRes[0]?.values) {
+          propsRes[0].values.forEach(([k, v]) => { scriptPropsCache[k] = v; });
+          localStorage.setItem("cached_gas_skill_props", JSON.stringify(scriptPropsCache));
+          renderPropsAndCatalog();
+        }
+        try {
+          const chatRes = db.exec("SELECT seq, role, content, model, created_at FROM chat_history ORDER BY seq ASC;");
+          if (chatRes[0]?.values) {
+            builtInChatLogRows = [];
+            builtInChatHistory = [];
+            document.getElementById("built-in-chat-stream").innerHTML = "";
+            chatRes[0].values.forEach(([seq, role, content, model, ts]) => {
+              builtInChatLogRows.push({ seq, role, text: content, model, ts });
+              builtInChatHistory.push({ role: role === "user" ? "user" : "model", parts: [{ text: String(content) }] });
+              renderChatBubbleOnly(role, role === "user" ? content : escapeHtml(content) + (model ? `\n<span class="text-[9px] text-slate-500">via ${escapeHtml(model)} (📥DB読込)</span>` : ""));
+            });
+            persistChatHistoryToLocal();
+          }
+        } catch (e) {}
+        try {
+          const bpmnRes = db.exec("SELECT bpmn_xml FROM bpmn_diagrams WHERE diagram_id = 'master_flow';");
+          if (bpmnRes[0]?.values?.[0]?.[0]) {
+            const xml = String(bpmnRes[0].values[0][0]);
+            localStorage.setItem("bpms_custom_bpmn_xml", xml);
+            await renderBpmnDiagram(xml);
+          }
+        } catch (e) {}
+        db.close();
+        setStatus(`📥 [${file.name}] を現在のシャードへインポート完了しました！`);
+      } catch (err) {
+        setStatus(`❌ DBインポートエラー: ${err.message}`, true);
+      }
+    }
+
+    function renderMermaidBotFlow(customDiagramCode = null) {
+      const canvas = document.getElementById("mermaid-canvas");
+      if (!canvas) return;
+      if (customDiagramCode) {
+        canvas.innerHTML = `<div class="mermaid">${escapeHtml(customDiagramCode)}</div>`;
+      }
+      if (window.mermaid) {
+        mermaid.initialize({ startOnLoad: false, theme: "dark" });
+        mermaid.run({ querySelector: ".mermaid" });
+      }
+    }
+
+    // =========================================================================
+    // 💬 Built-in Standard Gemi Chat Engine (with Inline Mermaid SVG Rendering)
+    // =========================================================================
+    function clearBuiltInChat() {
+      builtInChatHistory = [];
+      builtInChatLogRows = [];
+      localStorage.removeItem(getChatStorageKey());
+      document.getElementById("built-in-chat-stream").innerHTML = "";
+    }
+
+    function sendQuickChat(promptText) {
+      const inp = document.getElementById("built-in-chat-input");
+      if (inp) {
+        inp.value = promptText;
+        handleBuiltInChatSend();
+      }
+    }
+
+    function renderChatMermaidBlocks(containerEl) {
+      if (!window.mermaid || !containerEl) return;
+      const nodes = containerEl.querySelectorAll(".chat-mermaid");
+      if (nodes.length > 0) {
+        mermaid.initialize({ startOnLoad: false, theme: "dark" });
+        mermaid.run({ nodes });
+      }
+    }
+
+    function formatModelReplyWithMermaid(rawHtml) {
+      return rawHtml.replace(/```mermaid\s*([\s\S]*?)```/gi, (_, diag) => {
+        const cleanDiag = diag.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').trim();
+        return `<div class="my-2 p-2.5 rounded-lg bg-slate-950 border border-cyan-600/80 overflow-x-auto"><div class="text-[9px] text-cyan-300 font-bold mb-1">📊 チャット内 Mermaid フロー図</div><div class="chat-mermaid">${escapeHtml(cleanDiag)}</div></div>`;
+      });
+    }
+
+    function renderChatBubbleOnly(role, html) {
+      const stream = document.getElementById("built-in-chat-stream");
+      if (!stream) return;
+      const div = document.createElement("div");
+      if (role === "user") {
+        div.className = "p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-700/70 text-cyan-100 ml-5 whitespace-pre-wrap leading-relaxed";
+        div.innerHTML = `<div class="text-[10px] text-cyan-400 font-bold mb-0.5">👤 ダーリン</div>${escapeHtml(html)}`;
+      } else {
+        const formatted = formatModelReplyWithMermaid(html);
+        div.className = "p-2.5 rounded-xl bg-slate-900 border border-purple-700/70 text-slate-100 mr-3 whitespace-pre-wrap leading-relaxed";
+        div.innerHTML = `<div class="text-[10px] text-pink-400 font-bold mb-0.5">💖 Gemi 作業単位 Chat</div>${formatted}`;
+      }
+      stream.appendChild(div);
+      renderChatMermaidBlocks(div);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function appendChatMsg(role, html, rawPlainText = null, modelName = "") {
+      renderChatBubbleOnly(role, html);
+      const plain = rawPlainText !== null ? rawPlainText : String(html).replace(/<[^>]+>/g, "");
+      builtInChatLogRows.push({
+        seq: builtInChatLogRows.length + 1,
+        role,
+        text: plain,
+        model: modelName || "",
+        ts: new Date().toISOString()
+      });
+      persistChatHistoryToLocal();
+    }
+
+    function buildBpmsChatSystemPrompt() {
+      const targetId = document.getElementById("inp-target-script-id")?.value.trim() || "(未指定)";
+      const shard = document.getElementById("sel-duckdb-shard")?.value || "opfs://bpms_master.db";
+      const fnSummary = loadedRemoteFunctions.slice(0, 70).map(f => `- ${f.fnName}(${f.paramsStr}) [${f.fileName}.gs]`).join("\n") || "(未ロード)";
+      return `あなたは作業単位ごとの自律AIアシスタント「Gemi」です。
+【現在の作業単位コンテキスト】
+- ◀ 前の業務: ${workflowRelay.prevName} (${workflowRelay.prevTarget})
+- ● 今の業務: ${workflowRelay.currName} (${workflowRelay.currTarget})
+- ▶ 次の業務: ${workflowRelay.nextName} (${workflowRelay.nextTarget})
+- 対象リモートGAS Script ID: ${targetId}
+- アクティブ小分けDuckDBシャード: ${shard}
+- 動的ロード済み関数 (${loadedRemoteFunctions.length}件):
+${fnSummary}
+
+※ 業務フローや処理手順を図解するときは、返答内に \`\`\`mermaid ... \`\`\` コードブロックを含めるとチャット吹き出し内に直接SVG図が描画されます！
+
+【実行可能な自律JSONコマンド (必要に応じて \`\`\`json ... \`\`\` で出力)】
+1. \`{"tool": "CREATE_STEP_HTML", "args": {"fileName": "plugins/next_step", "stepTitle": "次工程タイトル", "prevName": "${workflowRelay.currName}", "prevTarget": "${workflowRelay.currTarget}", "nextName": "さらに次の工程 (仮)", "nextTarget": "draft:step3.html"}}\`
+   → 親IDEに新しい作業単位HTML画面（前の業務◀今の業務▶次の業務リンク＋専用Chat標準装備）を自動生成してタブを開きます！
+2. \`{"tool": "UPDATE_RELAY", "args": {"prevName": "...", "prevTarget": "...", "currName": "...", "nextName": "...", "nextTarget": "..."}}\`
+   → 現在の画面の「前の業務 ◀ 今の業務 ▶ 次の業務」リンクを更新します。
+3. \`{"tool": "RUN_GAS_FN", "args": {"scriptId": "${targetId}", "fnName": "関数名", "params": []}}\`
+   → リモートGAS関数を即実行します。
+4. \`{"tool": "UPDATE_MERMAID", "args": {"diagram": "flowchart LR\\n  A[前] --> B[今] --> C[次]"}}\`
+   → 画面左側の BotFlow Mermaid 図を更新します。
+5. \`{"tool": "DOWNLOAD_DB", "args": {"ext": "sqlite"}}\`
+   → 現在の小分けDuckDBシャードを .sqlite / .db / .sql 形式でダウンロードします。`;
+    }
+
+    async function runBuiltInChatCommands(replyText) {
+      const host = getAccessibleParentHost();
+      const blocks = [...replyText.matchAll(/```json\s*([\s\S]*?)```/gi)];
+      for (const m of blocks) {
+        try {
+          const parsed = JSON.parse(m[1].trim());
+          const cmds = Array.isArray(parsed) ? parsed : [parsed];
+          for (const cmd of cmds) {
+            if (!cmd || !cmd.tool) continue;
+            const args = cmd.args || {};
+
+            if (cmd.tool === "CREATE_STEP_HTML" && host) {
+              const cleanName = String(args.fileName || "plugins/next_step").replace(/\.html$/i, "");
+              const clonedDoc = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+              const newRelay = {
+                prevName: args.prevName || workflowRelay.currName,
+                prevTarget: args.prevTarget || workflowRelay.currTarget,
+                currName: args.stepTitle || cleanName,
+                currTarget: cleanName + ".html",
+                nextName: args.nextName || "次工程 (仮)",
+                nextTarget: args.nextTarget || "draft:next_step.html"
+              };
+              const patchedHtml = clonedDoc.replace(
+                /let workflowRelay = \{[\s\S]*?\};/,
+                `let workflowRelay = ${JSON.stringify(newRelay, null, 2)};`
+              );
+              const targetFiles = Array.isArray(host.projectFiles) ? host.projectFiles : host.eval("typeof projectFiles !== 'undefined' ? projectFiles : []");
+              const idx = targetFiles.findIndex(f => f.name === cleanName);
+              if (idx >= 0) targetFiles[idx].source = patchedHtml;
+              else targetFiles.push({ name: cleanName, type: "HTML", source: patchedHtml });
+
+              workflowRelay.nextName = newRelay.currName;
+              workflowRelay.nextTarget = cleanName + ".html";
+              localStorage.setItem("bpms_workflow_relay_cfg", JSON.stringify(workflowRelay));
+              applyWorkflowRelayToUi();
+
+              if (typeof host.renderFileTree === "function") host.renderFileTree();
+              if (typeof host.renderTabs === "function") host.renderTabs();
+              if (typeof host.openFileTab === "function") host.openFileTab(cleanName);
+              setStatus(`✨ 次工程画面 [${cleanName}.html] を生成し、前後リンクを接続しました！`);
+
+            } else if (cmd.tool === "UPDATE_RELAY") {
+              workflowRelay = { ...workflowRelay, ...args };
+              localStorage.setItem("bpms_workflow_relay_cfg", JSON.stringify(workflowRelay));
+              applyWorkflowRelayToUi();
+              setStatus("🔄 前後業務リレーリンクを更新しました！");
+
+            } else if (cmd.tool === "RUN_GAS_FN" && args.fnName) {
+              if (Array.isArray(args.params)) {
+                document.getElementById("inp-fn-params").value = JSON.stringify(args.params);
+              }
+              await executeRemoteGasFunction(args.scriptId || document.getElementById("inp-target-script-id").value.trim(), args.fnName);
+
+            } else if (cmd.tool === "UPDATE_MERMAID" && args.diagram) {
+              renderMermaidBotFlow(args.diagram);
+              setStatus("📊 Gemi が BotFlow Mermaid 図を更新しました！");
+
+            } else if (cmd.tool === "DOWNLOAD_DB") {
+              await downloadDatabaseFile(args.ext || "sqlite");
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    async function handleBuiltInChatSend() {
+      const inp = document.getElementById("built-in-chat-input");
+      const btn = document.getElementById("btn-built-in-send");
+      const text = inp.value.trim();
+      if (!text) return;
+
+      const apiKey = resolveGeminiApiKey();
+      if (!apiKey) {
+        toggleChatKeyInput();
+        setStatus("⚠️ GEMINI_API_KEY を設定してください", true);
+        return;
+      }
+
+      inp.value = "";
+      appendChatMsg("user", text);
+      builtInChatHistory.push({ role: "user", parts: [{ text }] });
+
+      btn.disabled = true;
+      btn.innerText = "⏳";
+
+      try {
+        const preferred = document.getElementById("chat-model-select")?.value || "gemini-3.8-flash";
+        const models = [preferred, "gemini-3.8-flash", "gemini-3.0-flash", "gemini-3.1-pro-preview", ...availableChatModels]
+          .filter((v, i, a) => v && a.indexOf(v) === i);
+
+        let reply = "";
+        let usedModel = "";
+        for (const model of models) {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: buildBpmsChatSystemPrompt() }] },
+              contents: builtInChatHistory.slice(-10),
+              generationConfig: { temperature: 0.3 }
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "(応答なし)";
+            usedModel = model;
+            break;
+          }
+        }
+        if (!reply) throw new Error("Gemini API からの応答取得に失敗しました");
+
+        builtInChatHistory.push({ role: "model", parts: [{ text: reply }] });
+        appendChatMsg("model", escapeHtml(reply) + `\n<span class="text-[9px] text-slate-500">via ${escapeHtml(usedModel)} (💾DB保存済)</span>`, reply, usedModel);
+        await runBuiltInChatCommands(reply);
+      } catch (err) {
+        appendChatMsg("model", `<span class="text-rose-400">❌ エラー: ${escapeHtml(err.message)}</span>`);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🚀";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      loadWorkflowRelayConfig();
+      await renderBpmnDiagram();
+      restoreChatHistoryFromLocal();
+      await bootstrapAllKnowledge();
+      if (document.getElementById("inp-target-script-id")?.value) {
+        await scanRemoteGasFunctions();
+      }
+    });
+  </script>
+</body>
+</html>

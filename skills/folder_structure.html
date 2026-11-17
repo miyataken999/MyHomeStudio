@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "project_architecture": "MyHomeStdio_Autonomous_GAS",
+  "folders": {
+    "plugins/": {
+      "role": "Single-file standalone HTML tools (Furniture)",
+      "type": "HTML",
+      "discovery_rule": "Parse first-line <!-- @skill {...} --> metadata",
+      "standard_files": [
+        { "path": "plugins/duckdb.html", "capability": "In-browser DuckDB-Wasm SQL, CSV/Parquet analytics" },
+        { "path": "plugins/sqlite.html", "capability": "Local SQLite relational DB & offline storage" },
+        { "path": "plugins/knowledge.html", "capability": "RAG memory search, Markdown notes, Soul DB viewer" },
+        { "path": "plugins/processmaker.html", "capability": "ProcessMaker 3 BPMS workflow trigger & routing" },
+        { "path": "plugins/supabase_manager.html", "capability": "Supabase PostgreSQL & Storage CRUD manager" }
+      ]
+    },
+    "controllers/": {
+      "role": "GAS Server-side API & Execution Bridges",
+      "type": "SERVER_JS",
+      "discovery_rule": "Scan exported functions and JSDoc @skill tags",
+      "standard_files": [
+        { "path": "controllers/api.gs", "capability": "doGet/doPost entrypoints & ScriptProperties sync" },
+        { "path": "controllers/bpmn_engine.gs", "capability": "ProcessMaker 3 OAuth2 & REST API dispatcher" },
+        { "path": "controllers/duckdb_analytics.gs", "capability": "Server-side data aggregation & index sync" },
+        { "path": "controllers/_system_bridge.gs", "capability": "System introspection & capability catalog builder" }
+      ]
+    },
+    "views/": {
+      "role": "Main Portal & Desktop IDE Views",
+      "type": "HTML",
+      "standard_files": [
+        { "path": "views/index.html", "capability": "Primary WebApp entry view" },
+        { "path": "views/futari_no_ie.html", "capability": "Cozy living room & personal portal" },
+        { "path": "views/gas_web_ide_studio.html", "capability": "Autonomous GAS Web IDE workstation" }
+      ]
+    },
+    "skills/": {
+      "role": "AI Capability Catalog & Workflow Definitions",
+      "type": "HTML_OR_JSON",
+      "standard_files": [
+        { "path": "skills/folder_structure.json", "capability": "Standard directory blueprint for GenAI" },
+        { "path": "skills/capabilities.json", "capability": "Auto-generated catalog of available tools & functions" },
+        { "path": "skills/bpmn_flows.json", "capability": "ProcessMaker 3 pro_uid & tas_uid registry" }
+      ]
+    }
+  }
+}

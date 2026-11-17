@@ -1,0 +1,429 @@
+<!-- @skill {"name": "MyHomeStdio Architecture SPA Shell (UI Mock)", "path": "skills/folder_structure.html", "triggers": ["ディレクトリ構造", "規定書", "SPAモック"], "entry": "App"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyHomeStdio SPA Shell (UI Mock)</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --sidebar: #111827;
+    --panel: #1e293b;
+    --panel-hover: #273549;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --purple: #c084fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  /* Top Navbar */
+  .topbar {
+    height: 48px;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--accent);
+  }
+  .pill {
+    font-size: 11px;
+    font-family: monospace;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(52, 211, 153, 0.14);
+    color: var(--green);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+  }
+  .top-actions { display: flex; gap: 8px; }
+  button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Workspace Grid */
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  /* Left Tree */
+  .sidebar {
+    width: 280px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .sidebar-head {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+  }
+  .search {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+  .tree-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .folder-group { margin-bottom: 6px; }
+  .folder-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--amber);
+  }
+  .folder-row:hover { background: var(--panel); }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-family: monospace;
+    color: #cbd5e1;
+  }
+  .file-row:hover { background: var(--panel); }
+  .file-row.active {
+    background: rgba(56, 189, 248, 0.16);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+
+  /* Main Pane */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .tabs {
+    display: flex;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 12px;
+  }
+  .tab {
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  .content {
+    flex: 1;
+    padding: 18px;
+    overflow-y: auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin-bottom: 8px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .placeholder-box {
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    background: rgba(15, 23, 42, 0.4);
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .slot {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+  }
+  .slot-title { color: var(--purple); font-family: monospace; margin-bottom: 4px; }
+
+  /* Modal Mock */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    width: 360px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+  }
+  .modal h3 { font-size: 14px; margin-bottom: 10px; color: var(--accent); }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 8px; border-radius: 5px; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+const MOCK_TREE = {
+  "plugins/": [
+    "duckdb.html",
+    "sqlite.html",
+    "knowledge.html",
+    "processmaker.html",
+    "supabase_manager.html"
+  ],
+  "controllers/": [
+    "api.gs",
+    "bpmn_engine.gs",
+    "duckdb_analytics.gs",
+    "_system_bridge.gs"
+  ],
+  "views/": [
+    "index.html",
+    "futari_no_ie.html",
+    "gas_web_ide_studio.html"
+  ],
+  "skills/": [
+    "folder_structure.json",
+    "capabilities.json",
+    "bpmn_flows.json"
+  ]
+};
+
+function App() {
+  const [openFolders, setOpenFolders] = useState({
+    "plugins/": true,
+    "controllers/": true,
+    "views/": true,
+    "skills/": true
+  });
+  const [selectedFile, setSelectedFile] = useState("plugins/duckdb.html");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [filter, setFilter] = useState("");
+  const [showModal, setShowModal] = useState(false);
+
+  const toggleFolder = (folder) => {
+    setOpenFolders(prev => ({ ...prev, [folder]: !prev[folder] }));
+  };
+
+  return (
+    <>
+      {/* Top Bar */}
+      <div className="topbar">
+        <div className="brand">
+          <span>📐 MyHomeStdio SPA</span>
+          <span className="pill">⚛️ UI Mock Shell</span>
+        </div>
+        <div className="top-actions">
+          <button className="primary" onClick={() => setShowModal(true)}>＋ 新規タスク雛形</button>
+          <button onClick={() => setActiveTab("json")}>📋 スキーマ表示</button>
+          <button onClick={() => alert("Mock: GAS同期ボタン")}>💾 GAS同期</button>
+        </div>
+      </div>
+
+      {/* Main Split */}
+      <div className="workspace">
+        {/* Left Explorer */}
+        <aside className="sidebar">
+          <div className="sidebar-head">
+            <input
+              className="search"
+              placeholder="ファイル検索..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </div>
+          <div className="tree-scroll">
+            {Object.entries(MOCK_TREE).map(([folder, files]) => {
+              const visibleFiles = files.filter(f =>
+                !filter || (folder + f).toLowerCase().includes(filter.toLowerCase())
+              );
+              if (visibleFiles.length === 0) return null;
+              const isOpen = openFolders[folder];
+              return (
+                <div key={folder} className="folder-group">
+                  <div className="folder-row" onClick={() => toggleFolder(folder)}>
+                    <span>{isOpen ? "▼" : "▶"} 📂 {folder}</span>
+                    <span style={{ fontSize: 11, color: "#94a3b8" }}>{visibleFiles.length}</span>
+                  </div>
+                  {isOpen && visibleFiles.map(file => {
+                    const fullPath = folder + file;
+                    return (
+                      <div
+                        key={fullPath}
+                        className={`file-row ${selectedFile === fullPath ? "active" : ""}`}
+                        onClick={() => setSelectedFile(fullPath)}
+                      >
+                        <span>{file.endsWith(".gs") ? "📄" : file.endsWith(".json") ? "⚙️" : "🌐"}</span>
+                        <span>{file}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Right Detail SPA Area */}
+        <main className="main">
+          <div className="tabs">
+            <div className={`tab ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>
+              🧩 規定・スロット構成
+            </div>
+            <div className={`tab ${activeTab === "preview" ? "active" : ""}`} onClick={() => setActiveTab("preview")}>
+              👁️ プレビュー枠
+            </div>
+            <div className={`tab ${activeTab === "json" ? "active" : ""}`} onClick={() => setActiveTab("json")}>
+              ⚙️ JSON定義枠
+            </div>
+          </div>
+
+          <div className="content">
+            <div className="card">
+              <h2>
+                <span>選択中:</span>
+                <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>{selectedFile}</span>
+              </h2>
+              <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                ※ ここは中身空の React SPA UI シェルです。あとから各スロットにロジックを差し込めます。
+              </p>
+
+              <div className="grid-2">
+                <div className="slot">
+                  <div className="slot-title">@skill Metadata Slot</div>
+                  <div style={{ color: "#94a3b8" }}>[ 空スロット: トリガー / エントリ定義 ]</div>
+                </div>
+                <div className="slot">
+                  <div className="slot-title">GAS Bridge Slot</div>
+                  <div style={{ color: "#94a3b8" }}>[ 空スロット: google.script.run 接続 ]</div>
+                </div>
+                <div className="slot">
+                  <div className="slot-title">Local DB Slot</div>
+                  <div style={{ color: "#94a3b8" }}>[ 空スロット: DuckDB / SQLite ]</div>
+                </div>
+                <div className="slot">
+                  <div className="slot-title">BPMS / n8n Slot</div>
+                  <div style={{ color: "#94a3b8" }}>[ 空スロット: ワークフロー連携 ]</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <h2>📦 コンテンツ領域（{activeTab.toUpperCase()}）</h2>
+              <div className="placeholder-box">
+                {activeTab === "overview" && "ここに規定書・役割説明・入出力インターフェースを表示（空モック）"}
+                {activeTab === "preview" && "ここにプラグイン単体の Live UI プレビューを表示（空モック）"}
+                {activeTab === "json" && "ここに folder_structure.json / capabilities.json の生データを表示（空モック）"}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Add Task Modal (UI Only) */}
+      {showModal && (
+        <div className="modal-bg" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>＋ 新規タスク雛形を追加（見た目のみ）</h3>
+            <div className="field">
+              <label>配置フォルダ</label>
+              <select>
+                <option>plugins/</option>
+                <option>controllers/</option>
+                <option>views/</option>
+                <option>skills/</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>ファイル名</label>
+              <input placeholder="例: new_task.html" />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+              <button onClick={() => setShowModal(false)}>閉じる</button>
+              <button className="primary" onClick={() => setShowModal(false)}>作成（モック）</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

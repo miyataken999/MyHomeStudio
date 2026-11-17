@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Python REPL + LocalDB + WebGPU LocalLLM</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <style>
+    body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; padding: 12px; margin: 0; font-size: 13px; }
+    h3 { color: #38bdf8; margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .status { font-size: 11px; color: #fbbf24; margin-bottom: 6px; }
+    .status.ready { color: #34d399; }
+    textarea, input, select {
+      width: 100%; box-sizing: border-box; background: #0f172a; color: #e2e8f0;
+      border: 1px solid #475569; border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 12px;
+    }
+    textarea { height: 95px; }
+    .bar { display: flex; gap: 6px; margin: 6px 0; align-items: center; flex-wrap: wrap; }
+    button {
+      background: #0284c7; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 12px; font-weight: 600; cursor: pointer; font-size: 12px;
+    }
+    button.purple { background: #7c3aed; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    pre {
+      background: #020617; color: #a7f3d0; border: 1px solid #1e293b;
+      border-radius: 6px; padding: 8px; min-height: 55px; max-height: 150px; overflow-y: auto;
+      margin: 0; font-family: ui-monospace, monospace; font-size: 11.5px; white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <!-- 1. Python REPL + SQLite ブロック -->
+  <div class="card">
+    <h3>🐍 1. Python REPL + ローカルDB（Knowledge抽出）</h3>
+    <div id="py-status" class="status">⏳ Pyodide + SQLite ロード中...</div>
+    <textarea id="py-code" spellcheck="false"># DBからナレッジを抽出して LLM 用のコンテキスト文字列を返す
+rows = con.execute("SELECT topic, body FROM knowledge").fetchall()
+ctx = "\n".join([f"- {t}: {b}" for t, b in rows])
+print(ctx)</textarea>
+    <div class="bar">
+      <button id="run-btn" disabled onclick="runPyRepl()">▶ Python実行 (Shift+Enter)</button>
+      <span style="font-size:11px;color:#94a3b8;">※出力が下の LocalLLM の知識(Context)に自動連携！</span>
+    </div>
+    <pre id="py-out">（ここにPython実行結果＝LLMへ渡す知識が表示されます）</pre>
+  </div>
+
+  <!-- 2. WebGPU Local LLM ブロック -->
+  <div class="card">
+    <h3>🧠 2. WebGPU Local LLM（ブラウザ内推論・API代0円）</h3>
+    <div id="llm-status" class="status">💤 未起動（モデルを選んで「⚡ WebGPUロード」を押してください）</div>
+    <div class="bar">
+      <select id="model-select" style="flex:1;">
+        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct（超軽量・約350MB・爆速テスト用）</option>
+        <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen2.5-1.5B-Instruct（日本語◎・約1.0GB）</option>
+        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma-2-2B-it（高精度・約1.4GB）</option>
+      </select>
+      <button id="load-llm-btn" class="purple" onclick="loadWebGPUModel()">⚡ WebGPUロード</button>
+    </div>
+    <div class="bar">
+      <input id="llm-prompt" type="text" value="上のDB知識をもとに、このシステムの構成を1文で説明して" />
+      <button id="ask-llm-btn" disabled onclick="askLocalLLM()">💬 ローカル推論</button>
+    </div>
+    <pre id="llm-out" style="color:#e0e7ff;">（ここに WebGPU Local LLM の応答がストリーミング表示されます）</pre>
+  </div>
+
+  <!-- 通常スクリプトで即座に Python 起動（外部ESMにブロックされない） -->
+  <script>
+    let pyodide = null;
+    let llmEngine = null;
+
+    async function initPy() {
+      const st = document.getElementById("py-status");
+      try {
+        st.textContent = "⏳ 1/2: Python エンジン読込中...";
+        pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/" });
+
+        st.textContent = "⏳ 2/2: sqlite3 パッケージ初期化中...";
+        await pyodide.loadPackage("sqlite3");
+
+        await pyodide.runPythonAsync(`
+import sqlite3, sys, io, traceback
+con = sqlite3.connect(":memory:")
+con.execute("CREATE TABLE knowledge (id INT, topic TEXT, body TEXT)")
+con.execute("INSERT INTO knowledge VALUES (1, 'BPMS仕様', '1タスク1プラグイン構成で自己完結する設計'), (2, 'LocalLLM', 'WebGPUとブラウザ内DBでAPI費用0円を実現')")
+con.commit()
+
+def exec_repl(code_str):
+    buf = io.StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    sys.stdout = sys.stderr = buf
+    try:
+        exec(code_str, globals())
+    except Exception:
+        traceback.print_exc()
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+    return buf.getvalue() or "✅ 実行完了（出力なし）"
+`);
+        st.textContent = "✅ Python + SQLite Ready!";
+        st.className = "status ready";
+        document.getElementById("run-btn").disabled = false;
+        await runPyRepl();
+      } catch (err) {
+        st.textContent = "❌ Pythonロードエラー: " + err.message;
+      }
+    }
+
+    async function runPyRepl() {
+      if (!pyodide) return;
+      const code = document.getElementById('py-code').value;
+      pyodide.globals.set("_user_code", code);
+      document.getElementById('py-out').textContent = await pyodide.runPythonAsync("exec_repl(_user_code)");
+    }
+
+    document.getElementById('py-code').addEventListener('keydown', (e) => {
+      if ((e.shiftKey || e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!document.getElementById('run-btn').disabled) runPyRepl();
+      }
+    });
+
+    // ボタンを押した時だけ WebLLM を動的 import して起動
+    async function loadWebGPUModel() {
+      const st = document.getElementById("llm-status");
+      const btn = document.getElementById("load-llm-btn");
+      if (!navigator.gpu) {
+        st.textContent = "❌ この環境では WebGPU が無効です（右上の ↗ で別タブ表示すると動きます）";
+        return;
+      }
+      btn.disabled = true;
+      const modelId = document.getElementById("model-select").value;
+      try {
+        st.className = "status";
+        st.textContent = "⏳ 1/2: WebLLM ライブラリ読込中...";
+        const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+
+        st.textContent = "⏳ 2/2: WebGPU モデル初期化中...";
+        llmEngine = await webllm.CreateMLCEngine(modelId, {
+          use_web_worker: false,
+          initProgressCallback: (report) => {
+            st.textContent = "⏳ " + report.text;
+          }
+        });
+        st.textContent = "✅ WebGPU Local LLM Ready! (" + modelId + ")";
+        st.className = "status ready";
+        document.getElementById("ask-llm-btn").disabled = false;
+      } catch (err) {
+        st.textContent = "❌ WebGPUロードエラー: " + err.message;
+        btn.disabled = false;
+      }
+    }
+
+    async function askLocalLLM() {
+      if (!llmEngine) return;
+      const out = document.getElementById("llm-out");
+      const btn = document.getElementById("ask-llm-btn");
+      const kbContext = document.getElementById("py-out").textContent;
+      const userPrompt = document.getElementById("llm-prompt").value;
+
+      btn.disabled = true;
+      out.textContent = "🤔 推論中...";
+      try {
+        const chunks = await llmEngine.chat.completions.create({
+          messages: [
+            { role: "system", content: "あなたは優秀な日本語アシスタントです。以下のローカルDB知識を参考に簡潔に回答してください。\n\n【ローカルDB知識】\n" + kbContext },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.4,
+          stream: true
+        });
+        out.textContent = "";
+        for await (const chunk of chunks) {
+          out.textContent += chunk.choices[0]?.delta?.content || "";
+        }
+      } catch (err) {
+        out.textContent = "❌ 推論エラー: " + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    initPy();
+  </script>
+</body>
+</html>

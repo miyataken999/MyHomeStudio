@@ -1,0 +1,1460 @@
+<!-- @skill {"name": "Gemi Scaffold, n8n-Flow & Properties-Bridge Agent", "path": "plugins/gemi-skill-properties-bridge.html", "triggers": ["プロジェクトScaffold", "n8nワークフロー", "Token取得実行", "小分けDuckDB", "DuckDBtoSQLite"], "entry": "openGemiPropertiesAgent"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemi Scaffold, n8n-Flow &amp; Properties-Bridge Agent</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #090d16; color: #f1f5f9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- Top Header -->
+  <header class="bg-gray-900 border-b border-purple-900/80 px-3 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-pink-400 animate-pulse"></span>
+      <span class="font-bold text-xs sm:text-sm text-pink-300 tracking-wide">Gemi Scaffold &amp; n8n Agent</span>
+      <span id="parent-conn-badge" class="text-[10px] px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-gray-400">
+        🔌 親IDE探索中...
+      </span>
+    </div>
+
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <select id="gemini-model-select" class="bg-black border border-gray-700 rounded px-2 py-1 text-[11px] text-cyan-300 focus:outline-none max-w-[165px]">
+        <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+        <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
+        <option value="gemini-3.0-flash">gemini-3.0-flash</option>
+      </select>
+      <button type="button" onclick="openScaffoldModal()" class="bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white border border-emerald-500 px-2 py-1 rounded text-[11px] font-bold cursor-pointer shadow">
+        🏗️ 新規Scaffold
+      </button>
+      <button type="button" onclick="toggleDrawer('n8n-drawer')" class="bg-orange-950 hover:bg-orange-900 text-orange-300 border border-orange-600 px-2 py-1 rounded text-[11px] font-bold cursor-pointer">
+        ⚡ n8n雛形実行
+      </button>
+      <button type="button" onclick="fetchGasPropertiesKnowledge(true)" class="bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 px-2 py-1 rounded text-[11px] font-bold cursor-pointer">
+        🔑 Props
+      </button>
+      <button type="button" onclick="syncWithParentHost(true)" class="bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 px-2 py-1 rounded text-[11px] font-bold cursor-pointer">
+        🔄 同期
+      </button>
+      <button type="button" onclick="toggleDrawer('props-drawer')" class="bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-700 px-2 py-1 rounded text-[11px] font-bold cursor-pointer">
+        🧠 台帳
+      </button>
+      <button type="button" onclick="clearChatMessages()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded text-[11px] cursor-pointer">
+        🗑️
+      </button>
+    </div>
+  </header>
+
+  <!-- Active Skill & Shard-DB + DuckDB <-> SQLite Export/Import Bar -->
+  <div class="bg-gray-950 border-b border-gray-800 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] shrink-0">
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-1">
+        <span class="text-pink-300 font-bold">🧠 Skill:</span>
+        <select id="active-skill-select" onchange="onSkillOrShardChanged()" class="bg-black border border-pink-800/80 rounded px-2 py-0.5 text-pink-200 focus:outline-none max-w-[155px]">
+          <option value="DEFAULT">デフォルト (全汎用BPMS/GAS)</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-1">
+        <span class="text-emerald-300 font-bold">🦆 小分けDB:</span>
+        <select id="active-shard-select" onchange="onSkillOrShardChanged()" class="bg-black border border-emerald-800/80 rounded px-2 py-0.5 text-emerald-200 focus:outline-none max-w-[165px]">
+          <option value="opfs://bpms_master.db">opfs://bpms_master.db (BPMS用)</option>
+          <option value="opfs://youtube_forge.db">opfs://youtube_forge.db (動画用)</option>
+          <option value="opfs://audit_monthly.db">opfs://audit_monthly.db (月次ログ)</option>
+        </select>
+      </div>
+
+      <!-- DuckDB <-> SQLite Export / Import Controls -->
+      <div class="flex items-center gap-1 bg-black/80 border border-teal-800/70 rounded px-1.5 py-0.5">
+        <span class="text-teal-300 font-bold text-[10px]">🦆⇄🗄️</span>
+        <button type="button" onclick="exportDuckDbToSqlite()" title="現在の小分けDuckDBをSQLite(.sqlite)ファイルとしてエクスポート"
+                class="bg-teal-950 hover:bg-teal-800 text-teal-200 border border-teal-700 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer">
+          📤 SQLite出力
+        </button>
+        <button type="button" onclick="triggerSqliteImport()" title="SQLite(.sqlite / .db / .sql)を現在の小分けDuckDBへインポート"
+                class="bg-indigo-950 hover:bg-indigo-800 text-indigo-200 border border-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer">
+          📥 SQLite取込
+        </button>
+        <input type="file" id="inp-sqlite-import-file" accept=".sqlite,.sqlite3,.db,.sql" class="hidden" onchange="handleSqliteFileSelected(event)">
+      </div>
+    </div>
+
+    <label class="flex items-center gap-1 cursor-pointer shrink-0">
+      <input type="checkbox" id="chk-auto-exec" checked class="accent-pink-500">
+      <span class="text-pink-300 font-bold text-[10px]">⚡ 自律実行ON</span>
+    </label>
+  </div>
+
+  <!-- Status Strip -->
+  <div class="bg-black/90 border-b border-gray-800 px-3 py-1 flex items-center justify-between text-[10px] text-gray-400 shrink-0">
+    <div class="flex items-center gap-2 truncate">
+      <span>🎯 GAS: <strong id="ctx-project-name" class="text-emerald-300">未接続</strong></span>
+      <span class="text-gray-600">|</span>
+      <span>📁 Files: <strong id="ctx-file-count" class="text-cyan-300">0</strong></span>
+      <span class="text-gray-600">|</span>
+      <span>🔑 Props: <strong id="ctx-props-count" class="text-amber-300">0 keys</strong></span>
+      <span class="text-gray-600">|</span>
+      <span>API Key: <strong id="ctx-key-status" class="text-rose-400">未設定</strong></span>
+    </div>
+  </div>
+
+  <!-- ⚡ n8n Token取得＆ワークフロー実行・雛形パネル -->
+  <div id="n8n-drawer" class="hidden bg-orange-950/30 border-b border-orange-700/80 p-3 text-xs space-y-2 shrink-0">
+    <div class="flex items-center justify-between">
+      <span class="font-bold text-orange-300">⚡ n8n ワークフロー Token自動取得 ＆ GAS直結実行（雛形セット）</span>
+      <button type="button" onclick="toggleDrawer('n8n-drawer')" class="text-gray-400 hover:text-white text-xs cursor-pointer">✕</button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+      <input type="text" id="inp-n8n-webhook-url" placeholder="n8n Webhook URL (ScriptProps N8N_WEBHOOK_URL から自動読込可)"
+             class="sm:col-span-2 bg-black border border-orange-700/80 rounded px-2 py-1 text-orange-200 focus:outline-none text-[11px]">
+      <input type="text" id="inp-n8n-flow-no" value="27" placeholder="n8n Flow No (例: 27)"
+             class="bg-black border border-orange-700/80 rounded px-2 py-1 text-cyan-200 focus:outline-none text-[11px]">
+    </div>
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button type="button" onclick="runN8nFlowWithAutoToken()"
+              class="bg-orange-600 hover:bg-orange-500 text-white font-bold px-3 py-1 rounded text-[11px] cursor-pointer shadow">
+        🚀 OAuth2 Token自動取得 → n8n 即時実行
+      </button>
+      <button type="button" onclick="copyN8nWorkflowTemplateJson()"
+              class="bg-gray-800 hover:bg-gray-700 text-orange-200 border border-orange-700 px-2.5 py-1 rounded text-[11px] cursor-pointer">
+        📋 n8n標準ワークフローJSON雛形をコピー
+      </button>
+      <button type="button" onclick="sendQuickPrompt('現在のGASプロジェクトの POST_GAS と doPost を呼び出すための、Google OAuth2 Token付き n8n ワークフロー JSON 雛形を生成して解説して')"
+              class="bg-pink-950 hover:bg-pink-900 text-pink-200 border border-pink-700 px-2.5 py-1 rounded text-[11px] cursor-pointer">
+        🤖 AIに専用n8nフローJSONを生成させる
+      </button>
+    </div>
+  </div>
+
+  <!-- 🏗️ Scaffold Project Generator Drawer -->
+  <div id="scaffold-drawer" class="hidden bg-emerald-950/30 border-b border-emerald-700/80 p-3 text-xs space-y-2 shrink-0">
+    <div class="flex items-center justify-between">
+      <span class="font-bold text-emerald-300">🏗️ 新規GASプロジェクト Scaffold（フォルダ構成＋n8n連携＋チャット本体一式）生成</span>
+      <button type="button" onclick="toggleDrawer('scaffold-drawer')" class="text-gray-400 hover:text-white text-xs cursor-pointer">✕</button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <input type="text" id="inp-scaffold-title" value="2026_BPMS_Plugin_Studio" placeholder="新規プロジェクト名..."
+             class="sm:col-span-2 bg-black border border-emerald-700 rounded px-2.5 py-1.5 text-emerald-200 focus:outline-none">
+      <button type="button" id="btn-run-scaffold" onclick="createScaffoldProjectFromUi()"
+              class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded cursor-pointer shadow">
+        🚀 一式生成して展開
+      </button>
+    </div>
+    <div class="text-[10px] text-emerald-200/80 leading-relaxed bg-black/50 p-2 rounded border border-emerald-900">
+      📦 <b>生成される標準フォルダ構成セット (計7ファイル / 約40KB):</b><br>
+      • <code>appsscript.json</code> (V8 / Asia/Tokyo / WebApp権限)<br>
+      • <code>controllers/aisync_properties_helper.gs</code> (ScriptProperties 500KB 読み書き)<br>
+      • <code>core/main_bridge.gs</code> (<code>doGet</code> / <code>doPost</code> / <code>POST_GAS</code> 最小API窓口)<br>
+      • <code>core/n8n_bridge.gs</code> (<b>Token自動取得＆n8nexec / Webhook 実行＆ワークフローJSON雛形生成！</b>)<br>
+      • <code>plugins/gemi-skill-properties-bridge.html</code> (<b>自律チャット＆小分けDBブリッジ本体を自己複製同梱！</b>)<br>
+      • <code>plugins/bpms-starter-skill.html</code> (Mermaid BotFlow＆業務UIプラグイン雛形)<br>
+      • <code>README.md.gs</code> (構成ガイド)
+    </div>
+  </div>
+
+  <!-- Collapsible ScriptProperties & Shard-DB Registry Drawer -->
+  <div id="props-drawer" class="hidden bg-gray-950 border-b border-purple-800/80 p-3 text-xs space-y-2.5 shrink-0 max-h-64 overflow-y-auto">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div>
+        <label class="block text-[10px] text-gray-400 mb-0.5">GEMINI_API_KEY:</label>
+        <input type="password" id="inp-gemini-key" placeholder="AIzaSy..." onchange="saveLocalConfig()"
+               class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-pink-300 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-[10px] text-gray-400 mb-0.5">対象 Script ID:</label>
+        <input type="text" id="inp-fallback-script-id" placeholder="1RBWcN6..." onchange="saveLocalConfig()"
+               class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-emerald-300 focus:outline-none">
+      </div>
+    </div>
+
+    <div class="border border-amber-800/60 rounded p-2 bg-black/60 space-y-1.5">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-amber-300">📝 ScriptProperties に専門プロンプト / 小分けDB定義 / n8n設定を登録 (最大9KB/key)</span>
+        <button type="button" onclick="savePropertyFromDrawer()" class="bg-amber-700 hover:bg-amber-600 text-white font-bold px-2.5 py-0.5 rounded text-[10px] cursor-pointer">
+          ☁️ GAS ScriptPropertiesへ保存
+        </button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+        <input type="text" id="prop-edit-key" value="SKILL_PROMPT_BPMS" placeholder="キー名 (例: SKILL_PROMPT_BPMS)"
+               class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[11px] text-cyan-300">
+        <input type="text" id="prop-edit-val" placeholder="値 (プロンプト文 または JSON定義)..."
+               class="sm:col-span-2 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[11px] text-gray-200">
+      </div>
+      <div id="loaded-props-list" class="text-[10px] text-gray-400 max-h-24 overflow-y-auto pt-1 border-t border-gray-800">
+        「🔑 Props」を押すと GAS 側の ScriptProperties (SKILL_PROMPT_* / DUCKDB_SHARD_* / N8N_*) をロードします...
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Stream -->
+  <main id="chat-stream" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs select-text">
+    <div class="p-3 rounded-xl bg-purple-950/40 border border-purple-800/70 text-purple-100 leading-relaxed">
+      <div class="font-bold text-pink-300 mb-1">💖 Gemi Scaffold, n8n-Flow &amp; Properties-Bridge Agent Ready!</div>
+      • <b>🏗️ 新規Scaffold</b>：<code>controllers/</code>・<code>core/main_bridge.gs</code>・<code>core/n8n_bridge.gs</code>・<code>plugins/</code> を一括自動生成！<br>
+      • <b>⚡ n8n雛形実行</b>：Google OAuth2 Token を自動取得して n8n ワークフロー（Webhook / <code>n8nexec</code>）を即発火＆JSON雛形出力！<br>
+      • <b>🦆⇄🗄️ SQLite Export / Import</b>：小分けDuckDBシャードをいつでも <code>.sqlite</code> で入出力！
+    </div>
+  </main>
+
+  <!-- Quick Action Chips & Input Footer -->
+  <footer class="bg-gray-900 border-t border-gray-800 p-2.5 flex flex-col gap-2 shrink-0">
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[10px]">
+      <button type="button" onclick="openScaffoldModal()"
+              class="px-2 py-1 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-200 border border-emerald-600 whitespace-nowrap font-bold cursor-pointer">
+        🏗️ 新規Scaffold作成
+      </button>
+      <button type="button" onclick="runN8nFlowWithAutoToken()"
+              class="px-2 py-1 rounded bg-orange-950 hover:bg-orange-900 text-orange-200 border border-orange-600 whitespace-nowrap font-bold cursor-pointer">
+        ⚡ Token取得→n8n実行
+      </button>
+      <button type="button" onclick="exportDuckDbToSqlite()"
+              class="px-2 py-1 rounded bg-teal-950 hover:bg-teal-900 text-teal-200 border border-teal-700 whitespace-nowrap font-bold cursor-pointer">
+        📤 SQLite出力
+      </button>
+      <button type="button" onclick="triggerSqliteImport()"
+              class="px-2 py-1 rounded bg-indigo-950 hover:bg-indigo-900 text-indigo-200 border border-indigo-700 whitespace-nowrap font-bold cursor-pointer">
+        📥 SQLite取込
+      </button>
+      <button type="button" onclick="sendQuickPrompt('現在のプロジェクト構成に合わせて、BPMS業務フロー設計用の専門プロンプト(SKILL_PROMPT_BPMS)と小分けDuckDB台帳(DUCKDB_SHARDS_REGISTRY)を生成してGASのScriptPropertiesへ保存して')"
+              class="px-2 py-1 rounded bg-pink-950 hover:bg-pink-900 text-pink-200 border border-pink-700 whitespace-nowrap font-bold cursor-pointer">
+        🧠 ナレッジ＆DB台帳登録
+      </button>
+    </div>
+
+    <div class="flex gap-2 items-end">
+      <textarea id="chat-input" rows="2"
+                placeholder="Gemiに指示を入力 (例: 「経費精算BPMSのScaffoldとn8nフローJSONを作って！」)..."
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();handleUserSend();}"
+                class="flex-1 bg-black border border-purple-700/80 rounded-lg p-2 text-xs text-purple-100 placeholder-gray-500 focus:outline-none focus:border-pink-400 resize-none"></textarea>
+      <button type="button" id="btn-send" onclick="handleUserSend()"
+              class="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold px-4 py-2 rounded-lg text-xs shadow cursor-pointer h-full">
+        🚀 送信
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    let chatHistory = [];
+    let discoveredGeminiModels = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.0-flash"];
+    let gasScriptProperties = {};
+    let sqlJsInstancePromise = null;
+    let parentContext = {
+      connected: false,
+      mode: "standalone",
+      scriptId: "",
+      projectName: "",
+      files: [],
+      functions: [],
+      geminiApiKey: ""
+    };
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function toggleDrawer(id) {
+      document.getElementById(id)?.classList.toggle("hidden");
+    }
+
+    function openScaffoldModal() {
+      const el = document.getElementById("scaffold-drawer");
+      if (el) {
+        el.classList.remove("hidden");
+        document.getElementById("inp-scaffold-title")?.focus();
+      }
+    }
+
+    function getAccessibleParentHost() {
+      const candidates = [window.opener, window.parent];
+      for (const win of candidates) {
+        if (!win || win === window) continue;
+        try {
+          if (win.closed) continue;
+          if (win.document && win.location.href !== undefined) return win;
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    function getHostProjectFiles(host) {
+      if (!host) return [];
+      try {
+        if (Array.isArray(host.projectFiles)) return host.projectFiles;
+        const lexical = host.eval("typeof projectFiles !== 'undefined' ? projectFiles : []");
+        if (Array.isArray(lexical)) return lexical;
+      } catch (e) {}
+      return [];
+    }
+
+    async function getHostGoogleAccessToken(host) {
+      if (!host) return "";
+      try {
+        if (typeof host.checkOrRefreshToken === "function") {
+          const t = await host.checkOrRefreshToken();
+          if (t) return t;
+        }
+        return host.eval("typeof currentAccessToken !== 'undefined' ? currentAccessToken : ''")
+          || host.localStorage?.getItem("google_oauth_access_token") || "";
+      } catch (e) {
+        return host.localStorage?.getItem("google_oauth_access_token") || "";
+      }
+    }
+
+    // =========================================================================
+    // ⚡ n8n Token自動取得 ＆ ワークフロー実行 / JSON雛形生成セット
+    // =========================================================================
+    function buildStandardN8nWorkflowJson(projectTitle, scriptId) {
+      return {
+        name: `${projectTitle || "BPMS_GAS"}_AutoFlow`,
+        nodes: [
+          {
+            parameters: { httpMethod: "POST", path: "bpms-gas-trigger", responseMode: "lastNode", options: {} },
+            id: "node-webhook-in",
+            name: "1. Webhook Trigger",
+            type: "n8n-nodes-base.webhook",
+            typeVersion: 2,
+            position: [220, 300]
+          },
+          {
+            parameters: {
+              method: "POST",
+              url: "={{ $json.body.gas_webapp_url || 'https://script.google.com/macros/s/YOUR_DEPLOY_ID/exec' }}",
+              sendHeaders: true,
+              headerParameters: {
+                parameters: [
+                  { name: "Authorization", value: "={{ 'Bearer ' + ($json.body.google_access_token || '') }}" },
+                  { name: "Content-Type", value: "application/json" }
+                ]
+              },
+              sendBody: true,
+              specifyBody: "json",
+              jsonBody: `={{ JSON.stringify({ action: $json.body.action || "bpms_exec", scriptId: "${scriptId || ""}", payload: $json.body.payload || {} }) }}`
+            },
+            id: "node-gas-exec",
+            name: "2. Call GAS POST_GAS / doPost",
+            type: "n8n-nodes-base.httpRequest",
+            typeVersion: 4.2,
+            position: [480, 300]
+          },
+          {
+            parameters: {
+              respondWith: "json",
+              responseBody: "={{ $json }}"
+            },
+            id: "node-respond",
+            name: "3. Respond JSON",
+            type: "n8n-nodes-base.respondToWebhook",
+            typeVersion: 1.1,
+            position: [740, 300]
+          }
+        ],
+        connections: {
+          "1. Webhook Trigger": { main: [[{ node: "2. Call GAS POST_GAS / doPost", type: "main", index: 0 }]] },
+          "2. Call GAS POST_GAS / doPost": { main: [[{ node: "3. Respond JSON", type: "main", index: 0 }]] }
+        },
+        settings: { executionOrder: "v1" }
+      };
+    }
+
+    async function copyN8nWorkflowTemplateJson() {
+      syncWithParentHost(false);
+      const wf = buildStandardN8nWorkflowJson(parentContext.projectName, parentContext.scriptId);
+      const jsonStr = JSON.stringify(wf, null, 2);
+      try {
+        await navigator.clipboard.writeText(jsonStr);
+        appendSystemLog("📋 n8n 標準ワークフロー JSON 雛形（Webhook → OAuth2 Token付き GAS 実行 → 応答）をクリップボードにコピーしました！");
+      } catch (e) {
+        appendSystemLog("ℹ️ n8n ワークフロー JSON 雛形を生成しました:\n" + jsonStr.slice(0, 600) + "...");
+      }
+    }
+
+    async function runN8nFlowWithAutoToken(customParams = {}) {
+      syncWithParentHost(false);
+      const host = getAccessibleParentHost();
+      const token = await getHostGoogleAccessToken(host);
+      const flowNo = customParams.no || document.getElementById("inp-n8n-flow-no")?.value.trim() || "27";
+      const webhookUrl = customParams.webhookUrl
+        || document.getElementById("inp-n8n-webhook-url")?.value.trim()
+        || gasScriptProperties.N8N_WEBHOOK_URL
+        || gasScriptProperties.N8N_EXEC_URL
+        || "";
+
+      appendSystemLog(`⚡ Google OAuth2 Token 取得完了 (${token ? token.slice(0, 14) + "..." : "未取得"}) -> n8n フロー #${flowNo} を発火中...`);
+
+      // パターンA: 直接 n8n Webhook URL が指定されている場合、Token を載せて即 POST
+      if (webhookUrl) {
+        try {
+          const res = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              flow_no: flowNo,
+              script_id: parentContext.scriptId,
+              project_name: parentContext.projectName,
+              google_access_token: token,
+              action: customParams.action || "bpms_flow_run",
+              payload: customParams.payload || { source: "gemi-scaffold-agent", timestamp: new Date().toISOString() }
+            })
+          });
+          const text = await res.text();
+          appendSystemLog(`✅ n8n Webhook 直接実行完了 (HTTP ${res.status}): ${text.slice(0, 260)}`);
+          return;
+        } catch (err) {
+          appendSystemLog(`⚠️ n8n Webhook 直接呼び出しフォールバック -> GAS n8nexec 経由を試行: ${err.message}`);
+        }
+      }
+
+      // パターンB: 親GASプロジェクトの n8nexec(no, check, token) を scripts.run で発火
+      if (host && parentContext.scriptId && token) {
+        try {
+          const runRes = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(parentContext.scriptId)}:run`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              function: "n8nexec",
+              parameters: [Number(flowNo) || 27, 1, token],
+              devMode: true
+            })
+          });
+          const runData = await runRes.json();
+          if (runData.error) {
+            throw new Error(runData.error.details?.[0]?.errorMessage || runData.error.message || "n8nexec error");
+          }
+          appendSystemLog(`✅ GAS n8nexec(${flowNo}, 1, token) 実行完了: ${JSON.stringify(runData.response?.result || {}).slice(0, 260)}`);
+          return;
+        } catch (err) {
+          appendSystemLog(`⚠️ n8nexec 実行結果: ${err.message} (ScriptProperties に N8N_WEBHOOK_URL を登録すると直接発火できます)`, true);
+        }
+      } else {
+        appendSystemLog("⚠️ n8n Webhook URL または 親IDE OAuth2 Token が未接続です。右上の「⚡ n8n雛形実行」からURLを設定してください。", true);
+      }
+    }
+
+    // =========================================================================
+    // 🏗️ Project Scaffold Generator (フォルダ構成 + n8n_bridge + チャット自己複製)
+    // =========================================================================
+    function buildPluginScaffoldFiles(projectTitle, extraCustomFiles = []) {
+      const selfChatHtml = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+      const sampleN8nJson = JSON.stringify(buildStandardN8nWorkflowJson(projectTitle, ""), null, 2);
+
+      const scaffold = [
+        {
+          name: "appsscript",
+          type: "JSON",
+          source: JSON.stringify({
+            timeZone: "Asia/Tokyo",
+            dependencies: {},
+            exceptionLogging: "STACKDRIVER",
+            runtimeVersion: "V8",
+            webapp: {
+              executeAs: "USER_DEPLOYING",
+              access: "ANYONE_ANONYMOUS"
+            }
+          }, null, 2)
+        },
+        {
+          name: "controllers/aisync_properties_helper",
+          type: "SERVER_JS",
+          source: `/**
+ * ScriptProperties 500KB クラウド脳 読み書きヘルパー
+ * SKILL_PROMPT_* / DUCKDB_SHARD_* / N8N_* を格納
+ */
+function getScriptProperties() {
+  return PropertiesService.getScriptProperties().getProperties();
+}
+
+function aisync_setProperties(propsObj) {
+  if (!propsObj || typeof propsObj !== "object") {
+    throw new Error("propsObj is required");
+  }
+  var clean = {};
+  Object.keys(propsObj).forEach(function(k) {
+    clean[k] = String(propsObj[k]);
+  });
+  PropertiesService.getScriptProperties().setProperties(clean, false);
+  return { status: "OK", updatedKeys: Object.keys(clean) };
+}
+`
+        },
+        {
+          name: "core/main_bridge",
+          type: "SERVER_JS",
+          source: `/**
+ * ${projectTitle} - Core API & Plugin Entry Bridge
+ */
+function doGet(e) {
+  var page = (e && e.parameter && e.parameter.page) || "plugins/gemi-skill-properties-bridge";
+  try {
+    return HtmlService.createHtmlOutputFromFile(page)
+      .setTitle("${projectTitle}")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "READY",
+      project: "${projectTitle}",
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  var payload = {};
+  try {
+    payload = JSON.parse(e.postData.contents || "{}");
+  } catch (err) {}
+  return ContentService.createTextOutput(JSON.stringify({
+    ok: true,
+    received: payload,
+    project: "${projectTitle}"
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function POST_GAS(action, data) {
+  return {
+    ok: true,
+    action: action || "ping",
+    data: data || {},
+    executedAt: new Date().toISOString()
+  };
+}
+`
+        },
+        {
+          name: "core/n8n_bridge",
+          type: "SERVER_JS",
+          source: `/**
+ * ${projectTitle} - n8n Token取得＆ワークフロー自動実行ブリッジ
+ * ScriptProperties に N8N_WEBHOOK_URL / N8N_BASE_URL / N8N_API_KEY を保存して利用
+ */
+function n8nexec(no, check, oauthToken) {
+  var props = PropertiesService.getScriptProperties().getProperties();
+  var webhookUrl = props.N8N_WEBHOOK_URL || props.N8N_EXEC_URL || "";
+  var token = oauthToken || ScriptApp.getOAuthToken();
+
+  if (!webhookUrl) {
+    return {
+      ok: false,
+      message: "N8N_WEBHOOK_URL が ScriptProperties に未設定です",
+      flowNo: no || 27,
+      hasToken: Boolean(token)
+    };
+  }
+
+  var payload = {
+    no: no || 27,
+    check: check || 1,
+    scriptId: ScriptApp.getScriptId(),
+    google_access_token: token,
+    timestamp: new Date().toISOString()
+  };
+
+  var res = UrlFetchApp.fetch(webhookUrl, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+
+  return {
+    ok: res.getResponseCode() < 300,
+    status: res.getResponseCode(),
+    body: res.getContentText()
+  };
+}
+
+function getN8nWorkflowScaffoldJson() {
+  return ${JSON.stringify(sampleN8nJson)};
+}
+`
+        },
+        {
+          name: "plugins/gemi-skill-properties-bridge",
+          type: "HTML",
+          source: selfChatHtml
+        },
+        {
+          name: "plugins/bpms-starter-skill",
+          type: "HTML",
+          source: `<!-- @skill {"name": "${projectTitle} BPMS Starter UI", "path": "plugins/bpms-starter-skill.html", "triggers": ["BPMS画面", "承認フォーム", "ワークフロー実行"], "entry": "openBpmsStarter"} -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>${projectTitle} - BPMS Starter Skill</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+</head>
+<body class="bg-slate-950 text-slate-100 p-4 font-mono">
+  <div class="max-w-xl mx-auto bg-slate-900 border border-emerald-700/70 rounded-xl p-4 space-y-3">
+    <div class="flex items-center justify-between">
+      <h1 class="text-sm font-bold text-emerald-300">🧩 ${projectTitle} — BPMS &amp; n8n Starter Plugin</h1>
+      <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700">Scaffold Ready</span>
+    </div>
+    <p class="text-xs text-slate-300">AppSheet の手作業ボット設定の代わりに、n8n ワークフロー JSON ＆ GAS <code>n8nexec()</code> / <code>POST_GAS()</code> で全自動連携します。</p>
+    <div class="space-y-2 text-xs">
+      <input id="inp-req-title" type="text" placeholder="申請タイトルを入力..." class="w-full bg-black border border-slate-700 rounded px-2.5 py-1.5 text-emerald-200">
+      <button onclick="alert('起票テスト: ' + document.getElementById('inp-req-title').value)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded cursor-pointer">
+        🚀 ワークフロー起票テスト
+      </button>
+    </div>
+  </div>
+</body>
+</html>
+`
+        },
+        {
+          name: "README.md",
+          type: "SERVER_JS",
+          source: `/*
+# ${projectTitle} (Plugin + n8n Scaffold Set)
+- appsscript.json : V8 / Asia/Tokyo マニフェスト
+- controllers/aisync_properties_helper.gs : ScriptProperties 読み書き窓口
+- core/main_bridge.gs : doGet / doPost / POST_GAS API窓口
+- core/n8n_bridge.gs : Token取得＆n8nexec実行・ワークフローJSON雛形生成
+- plugins/gemi-skill-properties-bridge.html : 自律AIチャット＆小分けDuckDBブリッジ本体
+- plugins/bpms-starter-skill.html : 業務UIプラグイン雛形
+*/
+`
+        }
+      ];
+
+      if (Array.isArray(extraCustomFiles)) {
+        for (const ef of extraCustomFiles) {
+          if (!ef || !ef.name) continue;
+          const cleanName = String(ef.name).replace(/\.(gs|js|html|json)$/i, "");
+          const idx = scaffold.findIndex(s => s.name === cleanName);
+          const item = { name: cleanName, type: ef.type || "SERVER_JS", source: String(ef.source || "") };
+          if (idx >= 0) scaffold[idx] = item;
+          else scaffold.push(item);
+        }
+      }
+      return scaffold;
+    }
+
+    async function executeCreateScaffoldProject(projectTitle, extraCustomFiles = []) {
+      const host = getAccessibleParentHost();
+      if (!host) throw new Error("親IDE未接続のため OAuth2 トークンを取得できません");
+      const token = await getHostGoogleAccessToken(host);
+      if (!token) throw new Error("Google OAuth2 トークンが未取得です");
+
+      const title = String(projectTitle || `BPMS_Plugin_Project_${Date.now()}`).trim();
+      appendSystemLog(`🏗️ 新規GASプロジェクト「${title}」を作成し、Plugin + n8n Scaffold一式を展開中...`);
+
+      const createRes = await fetch("https://script.googleapis.com/v1/projects", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ title })
+      });
+      const created = await createRes.json();
+      if (!createRes.ok) throw new Error(created.error?.message || "projects.create failed");
+
+      const newId = created.scriptId;
+      const scaffoldFiles = buildPluginScaffoldFiles(title, extraCustomFiles);
+      const totalBytes = scaffoldFiles.reduce((acc, f) => acc + new Blob([f.source]).size, 0);
+
+      const putRes = await fetch(`https://script.googleapis.com/v1/projects/${encodeURIComponent(newId)}/content`, {
+        method: "PUT",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ files: scaffoldFiles })
+      });
+      const putData = await putRes.json();
+      if (!putRes.ok) throw new Error(putData.error?.message || "projects.updateContent failed");
+
+      if (typeof host.fetchGasByExplicitScriptId === "function") {
+        await host.fetchGasByExplicitScriptId(newId);
+      }
+
+      syncWithParentHost(false);
+      appendSystemLog(
+        `🎉 新規Scaffoldプロジェクト作成完了！\n` +
+        `📌 プロジェクト名: ${title}\n` +
+        `🆔 Script ID: ${newId}\n` +
+        `📦 同梱セット: ${scaffoldFiles.length} files (合計 ${(totalBytes / 1024).toFixed(1)} KB / 上限50MBのわずか ${(totalBytes / (50 * 1024 * 1024) * 100).toFixed(3)}%！)\n` +
+        `📁 構成: controllers/, core/main_bridge, core/n8n_bridge, plugins/gemi-skill-properties-bridge, plugins/bpms-starter-skill`
+      );
+      return { scriptId: newId, title, fileCount: scaffoldFiles.length };
+    }
+
+    async function createScaffoldProjectFromUi() {
+      const btn = document.getElementById("btn-run-scaffold");
+      const title = document.getElementById("inp-scaffold-title")?.value.trim() || `BPMS_Plugin_${Date.now()}`;
+      btn.disabled = true;
+      btn.innerText = "⏳ 生成中...";
+      try {
+        await executeCreateScaffoldProject(title, []);
+        document.getElementById("scaffold-drawer")?.classList.add("hidden");
+      } catch (err) {
+        appendSystemLog(`❌ Scaffold作成エラー: ${err.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🚀 一式生成して展開";
+      }
+    }
+
+    // =========================================================================
+    // 🦆⇄🗄️ DuckDB <-> SQLite Export / Import Engine (via sql.js WASM)
+    // =========================================================================
+    async function ensureSqlJsLoaded() {
+      if (sqlJsInstancePromise) return sqlJsInstancePromise;
+      sqlJsInstancePromise = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js";
+        script.onload = async () => {
+          try {
+            const SQL = await window.initSqlJs({
+              locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+            });
+            resolve(SQL);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        script.onerror = () => reject(new Error("sql.js WASM ライブラリのロードに失敗しました"));
+        document.head.appendChild(script);
+      });
+      return sqlJsInstancePromise;
+    }
+
+    async function exportDuckDbToSqlite() {
+      syncWithParentHost(false);
+      const shardName = document.getElementById("active-shard-select")?.value || "opfs://bpms_master.db";
+      const safeBaseName = shardName.replace(/^opfs:\/\//, "").replace(/[^a-zA-Z0-9._-]/g, "_").replace(/\.db$/, "");
+
+      try {
+        appendSystemLog(`🦆→🗄️ 小分けDuckDBシャード [${shardName}] から SQLite (.sqlite) へ変換中...`);
+        const SQL = await ensureSqlJsLoaded();
+        const db = new SQL.Database();
+
+        db.run(`CREATE TABLE shard_metadata (
+          shard_name TEXT PRIMARY KEY,
+          project_id TEXT,
+          project_name TEXT,
+          exported_at TEXT
+        );`);
+        const metaStmt = db.prepare("INSERT INTO shard_metadata VALUES (?, ?, ?, ?);");
+        metaStmt.run([shardName, parentContext.scriptId || "local", parentContext.projectName || "local", new Date().toISOString()]);
+        metaStmt.free();
+
+        const host = getAccessibleParentHost();
+        let exportedExtraTables = 0;
+        try {
+          const duckConn = host?.eval("typeof duckDbConn !== 'undefined' ? duckDbConn : null");
+          if (duckConn && typeof duckConn.query === "function") {
+            const tablesRes = await duckConn.query("SHOW TABLES;");
+            const tableRows = tablesRes.toArray().map(r => r.toJSON());
+            for (const tr of tableRows) {
+              const tName = tr.name || Object.values(tr)[0];
+              if (!tName || ["gas_files", "script_properties", "shard_metadata"].includes(tName)) continue;
+              const rowsRes = await duckConn.query(`SELECT * FROM "${tName}" LIMIT 5000;`);
+              const rows = rowsRes.toArray().map(r => r.toJSON());
+              if (rows.length > 0) {
+                const cols = Object.keys(rows[0]);
+                const colDefs = cols.map(c => `"${c.replace(/"/g, '""')}" TEXT`).join(", ");
+                db.run(`CREATE TABLE "${tName.replace(/"/g, '""')}" (${colDefs});`);
+                const placeholders = cols.map(() => "?").join(", ");
+                const ins = db.prepare(`INSERT INTO "${tName.replace(/"/g, '""')}" VALUES (${placeholders});`);
+                for (const row of rows) {
+                  ins.run(cols.map(c => row[c] !== null && row[c] !== undefined ? String(row[c]) : null));
+                }
+                ins.free();
+                exportedExtraTables++;
+              }
+            }
+          }
+        } catch (duckErr) {}
+
+        db.run(`CREATE TABLE gas_files (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          script_id TEXT,
+          name TEXT,
+          file_type TEXT,
+          source TEXT,
+          updated_at TEXT
+        );`);
+        const fileStmt = db.prepare("INSERT INTO gas_files (script_id, name, file_type, source, updated_at) VALUES (?, ?, ?, ?, ?);");
+        const nowIso = new Date().toISOString();
+        for (const f of parentContext.files) {
+          fileStmt.run([parentContext.scriptId || "", f.name || "", f.type || "SERVER_JS", f.source || "", nowIso]);
+        }
+        fileStmt.free();
+
+        db.run(`CREATE TABLE script_properties (
+          prop_key TEXT PRIMARY KEY,
+          prop_value TEXT
+        );`);
+        const propStmt = db.prepare("INSERT INTO script_properties (prop_key, prop_value) VALUES (?, ?);");
+        for (const [k, v] of Object.entries(gasScriptProperties)) {
+          propStmt.run([k, String(v)]);
+        }
+        propStmt.free();
+
+        const binaryArray = db.export();
+        db.close();
+
+        const blob = new Blob([binaryArray], { type: "application/x-sqlite3" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const outFilename = `${safeBaseName}_${new Date().toISOString().slice(0, 10)}.sqlite`;
+        a.href = url;
+        a.download = outFilename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        appendSystemLog(
+          `✅ SQLite エクスポート完了！\n` +
+          `📦 ファイル: ${outFilename} (${(binaryArray.byteLength / 1024).toFixed(1)} KB)\n` +
+          `📊 内訳: gas_files=${parentContext.files.length}件 / script_properties=${Object.keys(gasScriptProperties).length}件 / DuckDB追加テーブル=${exportedExtraTables}個`
+        );
+      } catch (err) {
+        appendSystemLog(`❌ DuckDB→SQLite エクスポートエラー: ${err.message}`, true);
+      }
+    }
+
+    function triggerSqliteImport() {
+      const inp = document.getElementById("inp-sqlite-import-file");
+      if (inp) {
+        inp.value = "";
+        inp.click();
+      }
+    }
+
+    async function handleSqliteFileSelected(event) {
+      const file = event.target?.files?.[0];
+      if (!file) return;
+      const shardName = document.getElementById("active-shard-select")?.value || "opfs://bpms_master.db";
+      const host = getAccessibleParentHost();
+
+      try {
+        appendSystemLog(`🗄️→🦆 [${file.name}] を小分けDuckDB [${shardName}] へインポート中...`);
+        const SQL = await ensureSqlJsLoaded();
+        let db;
+
+        if (file.name.toLowerCase().endsWith(".sql")) {
+          const sqlText = await file.text();
+          db = new SQL.Database();
+          db.run(sqlText);
+        } else {
+          const buf = await file.arrayBuffer();
+          db = new SQL.Database(new Uint8Array(buf));
+        }
+
+        const tablesQuery = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
+        const tableNames = tablesQuery[0]?.values?.map(r => r[0]) || [];
+        let restoredFiles = 0;
+        let restoredProps = 0;
+        let importedTables = 0;
+
+        let duckConn = null;
+        try {
+          duckConn = host?.eval("typeof duckDbConn !== 'undefined' ? duckDbConn : null");
+        } catch (e) {}
+
+        for (const tName of tableNames) {
+          const res = db.exec(`SELECT * FROM "${tName.replace(/"/g, '""')}";`);
+          if (!res || res.length === 0) continue;
+          const cols = res[0].columns;
+          const values = res[0].values;
+
+          if (tName === "gas_files" && host) {
+            const targetFiles = getHostProjectFiles(host);
+            const nameIdx = cols.indexOf("name");
+            const typeIdx = cols.indexOf("file_type");
+            const srcIdx = cols.indexOf("source");
+            if (nameIdx >= 0 && srcIdx >= 0) {
+              for (const row of values) {
+                const fName = String(row[nameIdx] || "");
+                const fType = String(row[typeIdx] || "SERVER_JS");
+                const fSrc = String(row[srcIdx] || "");
+                if (!fName) continue;
+                const existIdx = targetFiles.findIndex(f => f.name === fName);
+                if (existIdx >= 0) {
+                  targetFiles[existIdx].source = fSrc;
+                  targetFiles[existIdx].type = fType;
+                } else {
+                  targetFiles.push({ name: fName, type: fType, source: fSrc });
+                }
+                restoredFiles++;
+              }
+              if (typeof host.renderFileTree === "function") host.renderFileTree();
+              if (typeof host.renderTabs === "function") host.renderTabs();
+            }
+          }
+
+          if (tName === "script_properties") {
+            const kIdx = cols.indexOf("prop_key");
+            const vIdx = cols.indexOf("prop_value");
+            if (kIdx >= 0 && vIdx >= 0) {
+              for (const row of values) {
+                const k = String(row[kIdx] || "");
+                if (k) {
+                  gasScriptProperties[k] = String(row[vIdx] || "");
+                  restoredProps++;
+                }
+              }
+              localStorage.setItem("cached_gas_skill_props", JSON.stringify(gasScriptProperties));
+              applyLoadedPropertiesToUi(gasScriptProperties);
+            }
+          }
+
+          if (duckConn && typeof duckConn.query === "function") {
+            const cleanShardPrefix = shardName.replace(/^opfs:\/\//, "").replace(/[^a-zA-Z0-9_]/g, "_").replace(/_db$/, "");
+            const duckTableName = `${cleanShardPrefix}__${tName.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+            const colDefs = cols.map(c => `"${c.replace(/"/g, '""')}" VARCHAR`).join(", ");
+            await duckConn.query(`DROP TABLE IF EXISTS "${duckTableName}";`);
+            await duckConn.query(`CREATE TABLE "${duckTableName}" (${colDefs});`);
+            for (const row of values.slice(0, 2000)) {
+              const valsSql = row.map(v => v === null || v === undefined ? "NULL" : `'${String(v).replace(/'/g, "''")}'`).join(", ");
+              await duckConn.query(`INSERT INTO "${duckTableName}" VALUES (${valsSql});`);
+            }
+            importedTables++;
+          }
+        }
+
+        db.close();
+        syncWithParentHost(false);
+        appendSystemLog(
+          `✅ SQLite インポート完了！ (${file.name} → ${shardName})\n` +
+          `📊 検出テーブル: [${tableNames.join(", ")}] | 復元ファイル=${restoredFiles}件 | 復元Props=${restoredProps}件 | DuckDB反映テーブル=${importedTables}個`
+        );
+      } catch (err) {
+        appendSystemLog(`❌ SQLite→DuckDB インポートエラー: ${err.message}`, true);
+      }
+    }
+
+    // =========================================================================
+    // Gemini Models & ScriptProperties Sync
+    // =========================================================================
+    async function refreshAvailableGeminiModels(apiKey) {
+      if (!apiKey) return;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const valid = (data.models || [])
+          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+          .map(m => m.name.replace(/^models\//, ""))
+          .filter(name => name.includes("gemini"));
+
+        if (valid.length > 0) {
+          const priority = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.0-flash", "gemini-3.0-pro"];
+          const sorted = [
+            ...priority.filter(p => valid.includes(p)),
+            ...valid.filter(v => !priority.includes(v))
+          ];
+          discoveredGeminiModels = sorted;
+          const sel = document.getElementById("gemini-model-select");
+          if (sel) {
+            const prev = sel.value;
+            sel.innerHTML = sorted.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+            sel.value = sorted.includes(prev) ? prev : sorted[0];
+          }
+        }
+      } catch (e) {}
+    }
+
+    function syncWithParentHost(notify = false) {
+      const host = getAccessibleParentHost();
+      const badge = document.getElementById("parent-conn-badge");
+      const projEl = document.getElementById("ctx-project-name");
+      const fileCountEl = document.getElementById("ctx-file-count");
+      const keyStatusEl = document.getElementById("ctx-key-status");
+
+      if (host) {
+        parentContext.connected = true;
+        parentContext.mode = "direct-host";
+        try {
+          parentContext.scriptId = host.eval("typeof currentActiveProjectId !== 'undefined' ? currentActiveProjectId : ''")
+            || host.document?.getElementById("quick-target-script-id")?.value
+            || host.localStorage?.getItem("cfg_project_edit_id") || "";
+          parentContext.projectName = host.eval("typeof currentActiveProjectName !== 'undefined' ? currentActiveProjectName : ''")
+            || host.document?.getElementById("header-script-name")?.innerText || parentContext.scriptId.slice(0, 12);
+        } catch (e) {
+          parentContext.scriptId = host.localStorage?.getItem("cfg_project_edit_id") || "";
+          parentContext.projectName = parentContext.scriptId.slice(0, 12);
+        }
+
+        parentContext.files = getHostProjectFiles(host);
+        const fnList = [];
+        parentContext.files.forEach(f => {
+          const matches = [...(f.source || "").matchAll(/function\s+([a-zA-Z0-9_$]+)\s*\(/g)];
+          matches.forEach(m => fnList.push(`${m[1]} (${f.name})`));
+        });
+        parentContext.functions = fnList;
+
+        const parentKey = host.localStorage?.getItem("cfg_gemini_api_key")
+          || host.document?.getElementById("cfg-modal-gemini-key")?.value
+          || localStorage.getItem("cfg_gemini_api_key") || "";
+        if (parentKey) {
+          parentContext.geminiApiKey = parentKey.trim();
+          localStorage.setItem("cfg_gemini_api_key", parentContext.geminiApiKey);
+          const inp = document.getElementById("inp-gemini-key");
+          if (inp && !inp.value) inp.value = parentContext.geminiApiKey;
+        }
+
+        badge.innerText = "🟢 親IDE直結";
+        badge.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-950 border border-emerald-600 text-emerald-300 font-bold";
+      } else {
+        parentContext.connected = false;
+        parentContext.mode = "standalone";
+        parentContext.geminiApiKey = (document.getElementById("inp-gemini-key")?.value || localStorage.getItem("cfg_gemini_api_key") || "").trim();
+        parentContext.scriptId = (document.getElementById("inp-fallback-script-id")?.value || localStorage.getItem("cfg_project_edit_id") || "").trim();
+        parentContext.projectName = parentContext.scriptId ? parentContext.scriptId.slice(0, 12) + "..." : "ローカル単体";
+        badge.innerText = "🟡 スタンドアロン";
+        badge.className = "text-[10px] px-2 py-0.5 rounded bg-amber-950 border border-amber-700 text-amber-300";
+      }
+
+      projEl.innerText = parentContext.projectName || "未選択";
+      fileCountEl.innerText = `${parentContext.files.length} files`;
+      if (parentContext.geminiApiKey) {
+        keyStatusEl.innerText = "OK";
+        keyStatusEl.className = "text-emerald-300";
+        refreshAvailableGeminiModels(parentContext.geminiApiKey);
+      } else {
+        keyStatusEl.innerText = "未設定";
+        keyStatusEl.className = "text-rose-400";
+      }
+
+      if (notify) {
+        appendSystemLog(`🔄 親IDE同期完了: files=${parentContext.files.length}, functions=${parentContext.functions.length}`);
+      }
+    }
+
+    async function fetchGasPropertiesKnowledge(notify = false) {
+      const host = getAccessibleParentHost();
+      const scriptId = parentContext.scriptId;
+      if (!host || !scriptId) {
+        if (notify) appendSystemLog("⚠️ 親IDEまたは Script ID が未接続です", true);
+        return;
+      }
+
+      try {
+        const token = await getHostGoogleAccessToken(host);
+        if (!token) throw new Error("OAuth2 トークン未取得");
+
+        if (notify) appendSystemLog("🔑 GAS ScriptProperties からプロンプト＆小分けDuckDB台帳を取得中...");
+        const res = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(scriptId)}:run`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            function: "getScriptProperties",
+            parameters: [],
+            devMode: true
+          })
+        });
+        const data = await res.json();
+        if (data.error) {
+          throw new Error(data.error.details?.[0]?.errorMessage || data.error.message || "scripts.run error");
+        }
+
+        const props = data.response?.result || {};
+        gasScriptProperties = props;
+        localStorage.setItem("cached_gas_skill_props", JSON.stringify(props));
+        applyLoadedPropertiesToUi(props);
+
+        if (notify) {
+          appendSystemLog(`✅ ScriptProperties ${Object.keys(props).length} 件をロードし、ナレッジ＆小分けDBドロップダウンに反映しました！`);
+        }
+      } catch (err) {
+        const cached = localStorage.getItem("cached_gas_skill_props");
+        if (cached) {
+          gasScriptProperties = JSON.parse(cached);
+          applyLoadedPropertiesToUi(gasScriptProperties);
+        }
+        if (notify) appendSystemLog(`⚠️ ScriptProperties 取得フォールバック: ${err.message}`, true);
+      }
+    }
+
+    function applyLoadedPropertiesToUi(props) {
+      const keys = Object.keys(props || {});
+      document.getElementById("ctx-props-count").innerText = `${keys.length} keys`;
+
+      // n8n Webhook URL がプロパティにあれば自動セット
+      const n8nInp = document.getElementById("inp-n8n-webhook-url");
+      if (n8nInp && !n8nInp.value && (props.N8N_WEBHOOK_URL || props.N8N_EXEC_URL)) {
+        n8nInp.value = props.N8N_WEBHOOK_URL || props.N8N_EXEC_URL;
+      }
+
+      const skillSel = document.getElementById("active-skill-select");
+      const prevSkill = skillSel.value;
+      const skillKeys = keys.filter(k => k.startsWith("SKILL_PROMPT_") || k.startsWith("PROMPT_"));
+      skillSel.innerHTML = `<option value="DEFAULT">デフォルト (全汎用BPMS/GAS)</option>` +
+        skillKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(k)} (${String(props[k]).length}文字)</option>`).join("");
+      if ([...skillSel.options].some(o => o.value === prevSkill)) skillSel.value = prevSkill;
+
+      const shardSel = document.getElementById("active-shard-select");
+      const prevShard = shardSel.value;
+      const shardOptions = [
+        { val: "opfs://bpms_master.db", label: "opfs://bpms_master.db (BPMS用)" },
+        { val: "opfs://youtube_forge.db", label: "opfs://youtube_forge.db (動画用)" },
+        { val: "opfs://audit_monthly.db", label: "opfs://audit_monthly.db (月次ログ)" }
+      ];
+
+      if (props.DUCKDB_SHARDS_REGISTRY) {
+        try {
+          const reg = JSON.parse(props.DUCKDB_SHARDS_REGISTRY);
+          Object.entries(reg).forEach(([k, v]) => {
+            const dbName = v.db_name || `opfs://${k}.db`;
+            if (!shardOptions.some(o => o.val === dbName)) {
+              shardOptions.push({ val: dbName, label: `${dbName} (${v.desc || k})` });
+            }
+          });
+        } catch (e) {}
+      }
+
+      keys.filter(k => k.startsWith("DUCKDB_SHARD_") && k !== "DUCKDB_SHARDS_REGISTRY").forEach(k => {
+        const valStr = String(props[k]);
+        shardOptions.push({ val: valStr, label: `${k}: ${valStr.slice(0, 28)}` });
+      });
+
+      shardSel.innerHTML = shardOptions.map(o => `<option value="${escapeHtml(o.val)}">${escapeHtml(o.label)}</option>`).join("");
+      if ([...shardSel.options].some(o => o.value === prevShard)) shardSel.value = prevShard;
+
+      const listEl = document.getElementById("loaded-props-list");
+      if (listEl) {
+        listEl.innerHTML = keys.length === 0
+          ? "プロパティがまだ登録されていません"
+          : keys.map(k => {
+              const v = String(props[k]);
+              const masked = /(KEY|TOKEN|SECRET|PASS)/i.test(k) && !k.startsWith("SKILL_PROMPT_")
+                ? v.slice(0, 4) + "***"
+                : v.slice(0, 80);
+              return `<div class="truncate">🔑 <span class="text-amber-300 font-bold">${escapeHtml(k)}</span>: <span class="text-gray-300">${escapeHtml(masked)}</span></div>`;
+            }).join("");
+      }
+    }
+
+    async function writeGasScriptProperties(propsObj) {
+      const host = getAccessibleParentHost();
+      const scriptId = parentContext.scriptId;
+      if (!host || !scriptId) throw new Error("親IDEまたは Script ID が未接続です");
+
+      const token = await getHostGoogleAccessToken(host);
+      if (!token) throw new Error("OAuth2 トークン未取得");
+
+      const res = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(scriptId)}:run`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          function: "aisync_setProperties",
+          parameters: [propsObj],
+          devMode: true
+        })
+      });
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error.details?.[0]?.errorMessage || data.error.message || "aisync_setProperties error");
+      }
+      Object.assign(gasScriptProperties, propsObj);
+      localStorage.setItem("cached_gas_skill_props", JSON.stringify(gasScriptProperties));
+      applyLoadedPropertiesToUi(gasScriptProperties);
+      return data.response?.result;
+    }
+
+    async function savePropertyFromDrawer() {
+      const k = document.getElementById("prop-edit-key").value.trim();
+      const v = document.getElementById("prop-edit-val").value.trim();
+      if (!k || !v) {
+        appendSystemLog("⚠️ キー名と値の両方を入力してください", true);
+        return;
+      }
+      if (new Blob([v]).size > 8900) {
+        appendSystemLog("⚠️ 1プロパティの上限(9KB)に近いため、キーを分割して保存してください", true);
+        return;
+      }
+      try {
+        await writeGasScriptProperties({ [k]: v });
+        appendSystemLog(`✅ GAS ScriptProperties [${k}] (${v.length}文字) をクラウドへ保存しました！`);
+      } catch (e) {
+        appendSystemLog(`❌ ScriptProperties 保存失敗: ${e.message}`, true);
+      }
+    }
+
+    function onSkillOrShardChanged() {
+      const skillKey = document.getElementById("active-skill-select").value;
+      const shardDb = document.getElementById("active-shard-select").value;
+      appendSystemLog(`🎛️ アクティブ切替 -> Skill: [${skillKey}] / 小分けDuckDB: [${shardDb}]`);
+    }
+
+    function saveLocalConfig() {
+      const k = document.getElementById("inp-gemini-key").value.trim();
+      const sid = document.getElementById("inp-fallback-script-id").value.trim();
+      if (k) localStorage.setItem("cfg_gemini_api_key", k);
+      if (sid) localStorage.setItem("cfg_project_edit_id", sid);
+      syncWithParentHost(false);
+    }
+
+    function clearChatMessages() {
+      chatHistory = [];
+      document.getElementById("chat-stream").innerHTML = "";
+      appendSystemLog("🧹 チャット履歴をクリアしました");
+    }
+
+    function sendQuickPrompt(text) {
+      const inp = document.getElementById("chat-input");
+      inp.value = text;
+      handleUserSend();
+    }
+
+    function appendMessageBubble(role, htmlContent) {
+      const stream = document.getElementById("chat-stream");
+      const div = document.createElement("div");
+      if (role === "user") {
+        div.className = "p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-700/70 text-cyan-100 ml-6 whitespace-pre-wrap leading-relaxed";
+        div.innerHTML = `<div class="text-[10px] text-cyan-400 font-bold mb-0.5">👤 ダーリン</div>${escapeHtml(htmlContent)}`;
+      } else {
+        div.className = "p-3 rounded-xl bg-gray-900/95 border border-purple-700/70 text-gray-100 mr-4 whitespace-pre-wrap leading-relaxed";
+        div.innerHTML = `<div class="text-[10px] text-pink-400 font-bold mb-1">💖 Gemi Scaffold &amp; n8n Agent</div>${htmlContent}`;
+      }
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function appendSystemLog(text, isError = false) {
+      const stream = document.getElementById("chat-stream");
+      const div = document.createElement("div");
+      div.className = `px-2.5 py-1.5 rounded text-[11px] border whitespace-pre-wrap ${isError ? "bg-rose-950/70 border-rose-700 text-rose-200" : "bg-emerald-950/50 border-emerald-800/80 text-emerald-200"}`;
+      div.innerText = text;
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function buildSystemPrompt() {
+      const skillKey = document.getElementById("active-skill-select").value;
+      const activeShard = document.getElementById("active-shard-select").value;
+      const customSkillPrompt = skillKey !== "DEFAULT" && gasScriptProperties[skillKey]
+        ? `\n【現在ロード中の専門ナレッジ (${skillKey})】\n${gasScriptProperties[skillKey]}\n`
+        : "";
+
+      const filesSummary = parentContext.files.slice(0, 45).map(f => `- ${f.name} (${f.type})`).join("\n") || "(なし)";
+      const funcsSummary = parentContext.functions.slice(0, 90).join(", ") || "(なし)";
+
+      return `あなたは GAS Web IDE Studio と直結した自律型AIエージェント「Gemi」です。
+新規プロジェクト作成時は「Plugin + n8n Scaffold（controllers/, core/main_bridge, core/n8n_bridge, plugins/ + チャットHTML自己複製一式）」を標準生成し、AppSheet の手作業ボット設定の代わりに n8n ワークフロー（OAuth2 Token自動取得→GAS実行）と小分け DuckDB / SQLite で全自動化します。
+${customSkillPrompt}
+【現在の動作コンテキスト】
+- 選択中GASプロジェクト: ${parentContext.projectName} (ID: ${parentContext.scriptId})
+- アクティブ小分けDuckDB: ${activeShard}
+- ロード済みScriptPropertiesキー: ${Object.keys(gasScriptProperties).join(", ") || "(未ロード)"}
+- 親IDEファイル (${parentContext.files.length}件):
+${filesSummary}
+- 検出済みGAS関数 (${parentContext.functions.length}件): ${funcsSummary}
+
+【実行可能な自律ツール一覧 (必要に応じて \`\`\`json ... \`\`\` で出力)】
+1. \`{"tool": "CREATE_SCAFFOLD_PROJECT", "args": {"title": "新規GASプロジェクト名", "extraFiles": [{"name": "plugins/custom-skill", "type": "HTML", "source": "..."}]}}\`
+   → Google クラウド上に新品の GAS プロジェクトを作成し、標準の Plugin + n8n Scaffold 一式（appsscript, controllers/aisync_properties_helper, core/main_bridge, core/n8n_bridge, plugins/gemi-skill-properties-bridge, plugins/bpms-starter-skill + extraFiles）を自動生成＆親IDEに展開します！
+2. \`{"tool": "RUN_N8N_WITH_TOKEN", "args": {"no": 27, "webhookUrl": "", "action": "bpms_exec", "payload": {}}}\`
+   → Google OAuth2 Token を自動取得し、n8n Webhook または GAS の n8nexec() を即時実行します！
+3. \`{"tool": "WRITE_SCRIPT_PROPERTY", "args": {"properties": {"SKILL_PROMPT_XXX": "専門プロンプト(9KB以内)", "DUCKDB_SHARDS_REGISTRY": "{...}"}}}\`
+   → GAS 側の ScriptProperties（aisync_setProperties）へ専門プロンプトや小分けDuckDB台帳・N8N_WEBHOOK_URLを保存します。
+4. \`{"tool": "READ_SCRIPT_PROPERTIES", "args": {}}\`
+   → GAS 側の ScriptProperties を最新取得します。
+5. \`{"tool": "EXPORT_DUCKDB_TO_SQLITE", "args": {}}\`
+   → 現在の小分けDuckDBシャードを標準 SQLite (.sqlite) バイナリとしてエクスポート・ダウンロードします。
+6. \`{"tool": "IMPORT_SQLITE_TO_DUCKDB", "args": {}}\`
+   → SQLite (.sqlite/.db/.sql) ファイル選択ダイアログを開いて現在の小分けDuckDBへインポートします。
+7. \`{"tool": "ADD_GAS_FILE", "args": {"name": "plugins/xxx", "type": "SERVER_JS または HTML または JSON", "source": "完全なコード"}}\`
+   → 現在の親IDEに新規ファイル（フォルダパス指定可）を追加します。
+8. \`{"tool": "SAVE_TO_GAS", "args": {}}\`
+   → 親IDEの全ファイルをGASクラウドへ保存します。
+9. \`{"tool": "RUN_GAS_FUNCTION", "args": {"functionName": "関数名", "params": []}}\`
+   → 親IDEのGAS関数を実行します。`;
+    }
+
+    async function executeAutonomousCommands(replyText) {
+      if (!document.getElementById("chk-auto-exec").checked) return;
+      const jsonBlocks = [...replyText.matchAll(/```json\s*([\s\S]*?)```/gi)];
+      if (jsonBlocks.length === 0) return;
+
+      const host = getAccessibleParentHost();
+
+      for (const match of jsonBlocks) {
+        let parsed;
+        try {
+          parsed = JSON.parse(match[1].trim());
+        } catch (e) {
+          appendSystemLog(`⚠️ JSONパーススキップ: ${e.message}`, true);
+          continue;
+        }
+
+        const commands = Array.isArray(parsed) ? parsed : [parsed];
+        for (const cmd of commands) {
+          if (!cmd || !cmd.tool) continue;
+          const args = cmd.args || {};
+          appendSystemLog(`⚡ [自律実行] ${cmd.tool} を実行中...`);
+
+          try {
+            switch (cmd.tool) {
+              case "CREATE_SCAFFOLD_PROJECT":
+              case "CREATE_NEW_GAS_PROJECT": {
+                await executeCreateScaffoldProject(
+                  args.title || `BPMS_Scaffold_${Date.now()}`,
+                  args.extraFiles || args.files || []
+                );
+                break;
+              }
+              case "RUN_N8N_WITH_TOKEN": {
+                await runN8nFlowWithAutoToken(args);
+                break;
+              }
+              case "WRITE_SCRIPT_PROPERTY": {
+                const props = args.properties || (args.key ? { [args.key]: args.value } : null);
+                if (!props) throw new Error("properties が指定されていません");
+                await writeGasScriptProperties(props);
+                appendSystemLog(`✅ GAS ScriptProperties (${Object.keys(props).join(", ")}) をクラウド保存＆UI反映しました！`);
+                break;
+              }
+              case "READ_SCRIPT_PROPERTIES": {
+                await fetchGasPropertiesKnowledge(true);
+                break;
+              }
+              case "EXPORT_DUCKDB_TO_SQLITE": {
+                await exportDuckDbToSqlite();
+                break;
+              }
+              case "IMPORT_SQLITE_TO_DUCKDB": {
+                triggerSqliteImport();
+                break;
+              }
+              case "ADD_GAS_FILE": {
+                if (!host) throw new Error("親IDE未接続");
+                const cleanName = String(args.name || "new_script").replace(/\.(gs|js|html|json)$/i, "");
+                const fType = args.type || "SERVER_JS";
+                const src = String(args.source || "");
+                const targetFiles = getHostProjectFiles(host);
+                const idx = targetFiles.findIndex(f => f.name === cleanName);
+                if (idx >= 0) {
+                  targetFiles[idx].source = src;
+                  targetFiles[idx].type = fType;
+                } else {
+                  targetFiles.push({ name: cleanName, type: fType, source: src });
+                }
+                if (typeof host.renderFileTree === "function") host.renderFileTree();
+                if (typeof host.renderTabs === "function") host.renderTabs();
+                appendSystemLog(`✅ 親IDEにファイル「${cleanName}」を追加・反映しました！`);
+                break;
+              }
+              case "SAVE_TO_GAS": {
+                if (host && typeof host.saveGasByExplicitScriptId === "function") {
+                  await host.saveGasByExplicitScriptId();
+                  appendSystemLog("✅ GASクラウドへの保存が完了しました！");
+                }
+                break;
+              }
+              case "RUN_GAS_FUNCTION": {
+                if (host && typeof host.triggerRunFunction === "function") {
+                  const picker = host.document?.getElementById("top-function-picker");
+                  if (picker && args.functionName) picker.value = args.functionName;
+                  await host.triggerRunFunction();
+                  appendSystemLog(`✅ GAS関数 [${args.functionName}] を実行しました！`);
+                }
+                break;
+              }
+              default:
+                appendSystemLog(`ℹ️ 未定義ツール: ${cmd.tool}`, true);
+            }
+          } catch (err) {
+            appendSystemLog(`❌ 実行エラー (${cmd.tool}): ${err.message}`, true);
+          }
+        }
+      }
+      syncWithParentHost(false);
+    }
+
+    async function callGeminiWithFallback(apiKey, preferredModel, payload) {
+      const candidates = [preferredModel, "gemini-3.8-flash", "gemini-3.0-flash", "gemini-3.1-pro-preview", ...discoveredGeminiModels]
+        .filter((v, i, a) => v && a.indexOf(v) === i);
+      let lastError = null;
+
+      for (const model of candidates) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (res.ok) return { data, usedModel: model };
+          lastError = new Error(data.error?.message || `HTTP ${res.status}`);
+          appendSystemLog(`⏳ ${model} (${res.status}) -> 次のモデルへ切替中...`);
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      throw lastError || new Error("全モデルで応答取得に失敗しました");
+    }
+
+    async function handleUserSend() {
+      const inp = document.getElementById("chat-input");
+      const btn = document.getElementById("btn-send");
+      const text = inp.value.trim();
+      if (!text) return;
+
+      syncWithParentHost(false);
+      const apiKey = parentContext.geminiApiKey;
+      if (!apiKey) {
+        toggleDrawer("props-drawer");
+        appendSystemLog("⚠️ GEMINI_API_KEY が未設定です。", true);
+        return;
+      }
+
+      inp.value = "";
+      appendMessageBubble("user", text);
+      chatHistory.push({ role: "user", parts: [{ text }] });
+
+      btn.disabled = true;
+      btn.innerText = "⏳";
+
+      try {
+        const preferredModel = document.getElementById("gemini-model-select").value || "gemini-3.8-flash";
+        const payload = {
+          systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
+          contents: chatHistory.slice(-12),
+          generationConfig: { temperature: 0.3 }
+        };
+
+        const { data, usedModel } = await callGeminiWithFallback(apiKey, preferredModel, payload);
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "(応答なし)";
+        chatHistory.push({ role: "model", parts: [{ text: reply }] });
+        appendMessageBubble("model", escapeHtml(reply) + `\n\n<span class="text-[9px] text-gray-500">via ${escapeHtml(usedModel)}</span>`);
+
+        await executeAutonomousCommands(reply);
+      } catch (err) {
+        appendSystemLog(`💥 Gemini API エラー: ${err.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🚀 送信";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      const savedKey = localStorage.getItem("cfg_gemini_api_key");
+      const savedSid = localStorage.getItem("cfg_project_edit_id");
+      if (savedKey) document.getElementById("inp-gemini-key").value = savedKey;
+      if (savedSid) document.getElementById("inp-fallback-script-id").value = savedSid;
+      syncWithParentHost(false);
+      await fetchGasPropertiesKnowledge(false);
+    });
+  </script>
+</body>
+</html>

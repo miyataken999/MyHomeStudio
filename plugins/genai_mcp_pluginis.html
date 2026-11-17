@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyHome GenAI MCP Plugin Studio</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --panel: #111827;
+      --panel-2: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #818cf8;
+      --success: #34d399;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      gap: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 {
+      margin: 0 0 10px 0;
+      font-size: 15px;
+      color: var(--accent);
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 820px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      font-family: inherit;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    button {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary {
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      border: none;
+      color: #fff;
+    }
+    button.primary:hover { opacity: 0.92; color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .chip {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .chip:hover { color: var(--text); border-color: var(--accent); }
+    pre {
+      background: #060a14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      font-size: 12.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      margin: 0;
+      color: #e2e8f0;
+    }
+    .log-box {
+      height: 170px;
+      overflow-y: auto;
+      background: #060a14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: var(--success);
+      white-space: pre-wrap;
+    }
+    .server-card {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .server-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .server-name { font-weight: 700; color: var(--accent); font-size: 14px; }
+    .pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(52, 211, 153, 0.4);
+    }
+    .pill.pkg {
+      background: rgba(129, 140, 248, 0.15);
+      color: var(--accent-2);
+      border-color: rgba(129, 140, 248, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span style="font-size: 22px;">🏡🔌</span>
+    <div>
+      <div style="font-weight: 700; font-size: 16px;">MyHome GenAI MCP Plugin Studio</div>
+      <div style="font-size: 11.5px; color: var(--muted);">GAS &amp; フロント 100%共通 UrlFetchApp / PropertiesService</div>
+    </div>
+  </div>
+  <div class="row">
+    <span class="badge">UrlFetchApp Ready</span>
+    <span class="badge">MCP Registry v0.1</span>
+  </div>
+</header>
+
+<div class="container">
+  <!-- PropertiesService 設定 -->
+  <div class="card">
+    <h2>🔑 PropertiesService.getScriptProperties()</h2>
+    <div class="row">
+      <input type="password" id="apiKeyInput" placeholder="GEMINI_API_KEY (AIzaSy...)" />
+      <button type="button" onclick="toggleKeyVisibility()">👁️</button>
+      <button type="button" class="primary" onclick="saveProps()">保存</button>
+      <span id="propStatus" style="font-size:12px; color:var(--success);"></span>
+    </div>
+  </div>
+
+  <!-- メインタブ -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('discover', this)">🧪 GenAI MCP 検索テスト</button>
+      <button class="tab-btn" onclick="switchTab('urlfetch', this)">🌐 UrlFetch 単体テスト</button>
+      <button class="tab-btn" onclick="switchTab('gascode', this)">📜 GAS 100%共通コード (.gs)</button>
+    </div>
+
+    <!-- TAB 1: GenAI MCP Discovery -->
+    <div id="tab-discover" class="tab-pane active" style="margin-top: 14px;">
+      <label>やりたいこと・探したいMCPの質問</label>
+      <textarea id="questionInput" rows="2" placeholder="例: Webページを綺麗なMarkdownに変換して取得できるMCPを探して"></textarea>
+
+      <div class="chips">
+        <span class="chip" onclick="setSample('Web検索やURLのMarkdown抽出ができるMCPを探して')">🌐 Web検索・Markdown抽出</span>
+        <span class="chip" onclick="setSample('GitHubのリポジトリやIssueを操作できるMCPを探して')">🐙 GitHub 操作</span>
+        <span class="chip" onclick="setSample('PostgreSQLやSQLiteなどデータベースにSQLを投げられるMCPは？')">🗄️ DB / SQL 連携</span>
+        <span class="chip" onclick="setSample('音声合成(TTS)やメディア処理ができるMCPサーバーを教えて')">🎙️ 音声合成 (TTS)</span>
+      </div>
+
+      <div class="row" style="margin-bottom: 14px;">
+        <button id="runDiscoverBtn" class="primary" onclick="runDiscoverTest()">🚀 GenAI に質問して MCP JSON を取得</button>
+        <button onclick="clearLogs()">ログ消去</button>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label>📡 リアルタイム実行ログ（Logger.log）</label>
+          <div id="logBox" class="log-box">Ready. GEMINI_API_KEY を設定して実行してください。</div>
+        </div>
+        <div>
+          <div class="row" style="justify-content: space-between; margin-bottom: 5px;">
+            <label style="margin:0;">📦 返却された構造化 JSON</label>
+            <button style="padding: 3px 8px; font-size: 11px;" onclick="copyText('jsonOutput')">📋 JSONコピー</button>
+          </div>
+          <pre id="jsonOutput" style="height: 170px; overflow-y: auto;">{}</pre>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <label>🧩 検出された MCP プラグイン候補</label>
+        <div id="serverCards">
+          <div style="color: var(--muted); font-size: 13px;">検索を実行するとここにカード展開されます。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: UrlFetch 単体テスト -->
+    <div id="tab-urlfetch" class="tab-pane" style="margin-top: 14px;">
+      <label>フロント版 UrlFetch(url, params) 動作確認</label>
+      <div class="row" style="margin-bottom: 10px;">
+        <select id="fetchMethod" style="width: 100px;">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+        </select>
+        <input type="text" id="fetchUrl" value="https://registry.modelcontextprotocol.io/v0.1/servers?search=web&version=latest&limit=3" />
+        <button class="primary" onclick="runRawUrlFetch()">⚡ 実行</button>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label>POST Payload（GET時は無視）</label>
+        <textarea id="fetchPayload" rows="2" placeholder='{"hello": "MyHOME"}'></textarea>
+      </div>
+      <pre id="rawFetchOutput" style="max-height: 300px; overflow-y: auto;">ここに結果が表示されます</pre>
+    </div>
+
+    <!-- TAB 3: GAS 100%共通コード -->
+    <div id="tab-gascode" class="tab-pane" style="margin-top: 14px;">
+      <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+        <span style="font-size: 12.5px; color: var(--muted);">そのまま .gs に貼って Apps Script API から関数呼び出しできます。</span>
+        <button class="primary" onclick="copyText('gasFullCode')">📋 GASコードを全コピー</button>
+      </div>
+      <pre id="gasFullCode" style="max-height: 440px; overflow-y: auto;"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+/** ============================================================================
+ *  1. フロントエンド用 GAS互換シム（シンプル直接 fetch 版）
+ * ============================================================================ */
+(function (global) {
+  const PROP_PREFIX = "MYHOME_GAS_PROP_";
+
+  global.PropertiesService = {
+    getScriptProperties() {
+      return {
+        getProperty: (key) => global.localStorage.getItem(PROP_PREFIX + key),
+        setProperty: (key, val) => global.localStorage.setItem(PROP_PREFIX + key, String(val)),
+        deleteProperty: (key) => global.localStorage.removeItem(PROP_PREFIX + key)
+      };
+    }
+  };
+
+  global.Logger = {
+    log(...args) {
+      const msg = args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ");
+      console.log("[Logger]", msg);
+      const box = document.getElementById("logBox");
+      if (box) {
+        box.textContent += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+  };
+
+  async function urlFetch(url, params = {}) {
+    const method = (params.method || "GET").toUpperCase();
+    const headers = { ...(params.headers || {}) };
+    if (params.contentType) headers["Content-Type"] = params.contentType;
+
+    const res = await global.fetch(url, {
+      method,
+      headers,
+      body: method !== "GET" && method !== "HEAD" ? params.payload : undefined
+    });
+    const text = await res.text();
+    const resHeaders = Object.fromEntries(res.headers.entries());
+
+    if (!res.ok && !params.muteHttpExceptions) {
+      throw new Error(`Request failed for ${url} returned code ${res.status}`);
+    }
+    return {
+      getResponseCode: () => res.status,
+      getContentText: () => text,
+      getAllHeaders: () => resHeaders
+    };
+  }
+
+  async function urlFetchAll(requests) {
+    return Promise.all(
+      requests.map(req => typeof req === "string" ? urlFetch(req) : urlFetch(req.url, req))
+    );
+  }
+
+  global.UrlFetchApp = { fetch: urlFetch, fetchAll: urlFetchAll };
+  global.UrlFetch = urlFetch;
+})(window);
+
+/** ============================================================================
+ *  2. 【GAS & フロント 100%共通本体】GenAI MCP Discovery Plugin
+ * ============================================================================ */
+const MCP_REGISTRY_API = "https://registry.modelcontextprotocol.io/v0.1/servers";
+
+async function discoverMcpByQuestion(userQuestion) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("GEMINI_API_KEY が未設定です");
+
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const tools = [{
+    functionDeclarations: [{
+      name: "search_mcp_registry",
+      description: "Official MCP Registry を英語キーワードで検索する（複数キーワード並列呼び出し可）",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          keyword: { type: "STRING", description: "英語の検索キーワード（例: web, github, postgres, slack, tts）" }
+        },
+        required: ["keyword"]
+      }
+    }]
+  }];
+
+  const systemInstruction = {
+    parts: [{
+      text: [
+        "あなたはMCPプラグイン選定エージェントです。",
+        "ユーザーの質問に合うMCPサーバーを search_mcp_registry で検索し、",
+        "最終回答は必ず以下のJSONスキーマのみ（Markdown記法なし）で出力してください:",
+        '{"query_summary": "検索意図の要約", "servers": [{"name": "サーバー名", "description": "日本語での機能説明", "remote_url": "リモートURLまたはnull", "toml": "[mcp_servers.xxx]\\nurl = \\"...\\""}]}'
+      ].join("\n")
+    }]
+  };
+
+  const contents = [{ role: "user", parts: [{ text: userQuestion }] }];
+
+  Logger.log("🧠 GenAI に検索キーワードを思考させています...");
+  let res = await postJsonCommon(geminiUrl, { contents, tools, systemInstruction });
+  if (res.error) throw new Error(`Gemini API Error: ${res.error.message}`);
+
+  const assistantMsg = res?.candidates?.[0]?.content;
+  if (!assistantMsg) throw new Error("Geminiからの応答が空でした");
+
+  const fnCalls = (assistantMsg.parts || []).filter(p => p.functionCall);
+
+  if (fnCalls.length > 0) {
+    const keywords = fnCalls.map(fc => fc.functionCall.args.keyword);
+    Logger.log(`🔎 Official MCP Registry を並列検索中: [${keywords.join(", ")}]`);
+
+    const requests = keywords.map(kw => ({
+      url: `${MCP_REGISTRY_API}?search=${encodeURIComponent(kw)}&version=latest&limit=6`,
+      muteHttpExceptions: true
+    }));
+    const responses = await UrlFetchApp.fetchAll(requests);
+
+    const fnResponseParts = fnCalls.map((fc, idx) => {
+      const data = JSON.parse(responses[idx].getContentText() || "{}");
+      const servers = (data.servers || []).map(item => {
+        const s = item.server || item;
+        return {
+          name: s.name,
+          description: s.description,
+          version: s.version,
+          remotes: s.remotes || [],
+          packages: s.packages || []
+        };
+      });
+      Logger.log(`📥 "${fc.functionCall.args.keyword}" -> ${servers.length}件ヒット`);
+      return {
+        functionResponse: {
+          name: "search_mcp_registry",
+          response: { keyword: fc.functionCall.args.keyword, servers }
+        }
+      };
+    });
+
+    contents.push(assistantMsg);
+    contents.push({ role: "user", parts: fnResponseParts });
+
+    Logger.log("✨ GenAI が最適候補を選定して JSON を生成中...");
+    res = await postJsonCommon(geminiUrl, {
+      contents,
+      systemInstruction,
+      generationConfig: { responseMimeType: "application/json" }
+    });
+  }
+
+  let rawText = res?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  rawText = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+  const parsed = JSON.parse(rawText);
+  Logger.log("✅ 完了！JSONを取得しました。");
+  return parsed;
+}
+
+async function postJsonCommon(url, payload) {
+  const res = await UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  return JSON.parse(res.getContentText());
+}
+
+/** ============================================================================
+ *  3. UI コントロール
+ * ============================================================================ */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function initUI() {
+  const props = PropertiesService.getScriptProperties();
+  document.getElementById("apiKeyInput").value = props.getProperty("GEMINI_API_KEY") || "";
+  document.getElementById("gasFullCode").textContent =
+`const MCP_REGISTRY_API = "https://registry.modelcontextprotocol.io/v0.1/servers";
+
+${discoverMcpByQuestion.toString()}
+
+${postJsonCommon.toString()}`;
+}
+
+function saveProps() {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("GEMINI_API_KEY", document.getElementById("apiKeyInput").value.trim());
+  const st = document.getElementById("propStatus");
+  st.textContent = "✅ 保存完了";
+  setTimeout(() => (st.textContent = ""), 2500);
+}
+
+function toggleKeyVisibility() {
+  const el = document.getElementById("apiKeyInput");
+  el.type = el.type === "password" ? "text" : "password";
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("tab-" + name).classList.add("active");
+}
+
+function setSample(text) {
+  document.getElementById("questionInput").value = text;
+}
+
+function clearLogs() {
+  document.getElementById("logBox").textContent = "Cleared.";
+}
+
+async function runDiscoverTest() {
+  const q = document.getElementById("questionInput").value.trim();
+  if (!q) return alert("質問を入力してください");
+
+  const btn = document.getElementById("runDiscoverBtn");
+  btn.disabled = true;
+  document.getElementById("logBox").textContent = `[Start] 質問: "${q}"`;
+
+  try {
+    const result = await discoverMcpByQuestion(q);
+    document.getElementById("jsonOutput").textContent = JSON.stringify(result, null, 2);
+    renderServerCards(result.servers || []);
+  } catch (err) {
+    Logger.log(`❌ エラー: ${err.message}`);
+    document.getElementById("jsonOutput").textContent = JSON.stringify({ error: err.message }, null, 2);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderServerCards(servers) {
+  const container = document.getElementById("serverCards");
+  if (!servers.length) {
+    container.innerHTML = `<div style="color: var(--muted); font-size: 13px;">該当するサーバーが見つかりませんでした。</div>`;
+    return;
+  }
+  container.innerHTML = servers.map((s, i) => {
+    const isRemote = Boolean(s.remote_url);
+    const badge = isRemote
+      ? `<span class="pill">🌐 Remote HTTP</span>`
+      : `<span class="pill pkg">📦 Package (npx/uvx)</span>`;
+    const tomlId = `toml-snippet-${i}`;
+    return `
+      <div class="server-card">
+        <div class="server-header">
+          <div>
+            <span class="server-name">${escapeHtml(s.name || "Unknown")}</span>
+            ${badge}
+          </div>
+          <button style="padding: 4px 10px; font-size: 11px;" onclick="copyText('${tomlId}')">📋 config.toml コピー</button>
+        </div>
+        <div style="font-size: 13px; margin-bottom: 8px;">${escapeHtml(s.description || "")}</div>
+        <pre id="${tomlId}">${escapeHtml(s.toml || "")}</pre>
+      </div>
+    `;
+  }).join("");
+}
+
+async function runRawUrlFetch() {
+  const url = document.getElementById("fetchUrl").value.trim();
+  const method = document.getElementById("fetchMethod").value;
+  const payload = document.getElementById("fetchPayload").value;
+  const out = document.getElementById("rawFetchOutput");
+  out.textContent = "Fetching...";
+  try {
+    const res = await UrlFetch(url, {
+      method,
+      contentType: method === "POST" ? "application/json" : undefined,
+      payload: method === "POST" ? payload : undefined,
+      muteHttpExceptions: true
+    });
+    out.textContent = `HTTP ${res.getResponseCode()}\n\n${res.getContentText()}`;
+  } catch (err) {
+    out.textContent = `Error: ${err.message}`;
+  }
+}
+
+function copyText(elementId) {
+  navigator.clipboard.writeText(document.getElementById(elementId).textContent);
+}
+
+initUI();
+</script>
+</body>
+</html>
